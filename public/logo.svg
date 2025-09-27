@@ -1,0 +1,139 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gradient for the icon -->
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="35%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Dream bubble gradient -->
+    <radialGradient id="dreamGradient" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.3" />
+    </radialGradient>
+    
+    <!-- Alignment lines gradient -->
+    <linearGradient id="alignGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ec4899;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Inner shadow -->
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+      <feOffset dx="1" dy="1" result="offset"/>
+      <feFlood flood-color="#000000" flood-opacity="0.1"/>
+      <feComposite in2="offset" operator="in"/>
+      <feComposite in2="SourceGraphic" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#mainGradient)" filter="url(#glow)"/>
+  
+  <!-- Inner decorative ring -->
+  <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  
+  <!-- Dream Cloud/Bubble (representing dreams and aspirations) -->
+  <g transform="translate(25, 15)">
+    <!-- Main cloud shape -->
+    <path d="M15 25 C10 20, 10 15, 15 12 C18 8, 25 8, 28 12 C32 10, 38 10, 40 15 C45 15, 45 20, 40 25 C42 28, 42 32, 38 35 C35 38, 25 38, 22 35 C18 38, 12 35, 10 30 C8 28, 8 25, 15 25 Z" 
+          fill="url(#dreamGradient)" opacity="0.9"/>
+    
+    <!-- Dream sparkles inside cloud -->
+    <g fill="rgba(255,255,255,0.8)">
+      <circle cx="20" cy="22" r="1.5"/>
+      <circle cx="30" cy="18" r="1"/>
+      <circle cx="35" cy="25" r="1.2"/>
+      <circle cx="25" cy="30" r="0.8"/>
+    </g>
+    
+    <!-- Starburst for main dream -->
+    <g transform="translate(25, 22)" fill="rgba(255,255,255,0.9)">
+      <polygon points="0,-4 1,-1 4,0 1,1 0,4 -1,1 -4,0 -1,-1" transform="scale(0.8)"/>
+    </g>
+  </g>
+
+  <!-- Alignment Arrows (representing the alignment process) -->
+  <g transform="translate(20, 55)">
+    <!-- First alignment arrow -->
+    <path d="M5 5 L25 5 M20 0 L25 5 L20 10" 
+          stroke="url(#alignGradient)" stroke-width="3" fill="none" 
+          stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    
+    <!-- Second alignment arrow -->
+    <path d="M35 5 L55 5 M50 0 L55 5 L50 10" 
+          stroke="url(#alignGradient)" stroke-width="3" fill="none" 
+          stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  </g>
+
+  <!-- Target/Opportunity Symbol (representing aligned opportunities) -->
+  <g transform="translate(55, 65)">
+    <!-- Outer target ring -->
+    <circle cx="15" cy="15" r="12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
+    
+    <!-- Middle target ring -->
+    <circle cx="15" cy="15" r="8" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"/>
+    
+    <!-- Inner target -->
+    <circle cx="15" cy="15" r="5" fill="rgba(255,255,255,0.9)"/>
+    
+    <!-- Center dot -->
+    <circle cx="15" cy="15" r="2" fill="url(#mainGradient)"/>
+    
+    <!-- Target sparkle -->
+    <g transform="translate(15, 15)" fill="rgba(255,255,255,1)">
+      <polygon points="0,-2 0.5,-0.5 2,0 0.5,0.5 0,2 -0.5,0.5 -2,0 -0.5,-0.5" transform="scale(0.6)"/>
+    </g>
+  </g>
+
+  <!-- Connection Lines (representing the alignment/connection) -->
+  <g stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none" opacity="0.7">
+    <!-- Curved connection from dream to opportunity -->
+    <path d="M45 35 Q50 45 65 65" stroke-linecap="round"/>
+    
+    <!-- Secondary connection lines -->
+    <line x1="40" y1="40" x2="50" y2="50" stroke-width="1" opacity="0.5"/>
+    <line x1="50" y1="35" x2="60" y2="45" stroke-width="1" opacity="0.5"/>
+  </g>
+
+  <!-- Floating Elements (representing transformation and growth) -->
+  <g fill="rgba(255,255,255,0.6)">
+    <!-- Small floating dots -->
+    <circle cx="25" cy="70" r="1" opacity="0.8">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="75" cy="25" r="1.5" opacity="0.6">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="80" cy="45" r="0.8" opacity="0.7">
+      <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Success Stars (representing achievement) -->
+  <g fill="rgba(255,255,255,0.8)">
+    <polygon points="15,8 16,11 19,11 17,13 18,16 15,14 12,16 13,13 11,11 14,11" transform="scale(0.7)" opacity="0.6"/>
+    <polygon points="85,20 86,22 88,22 87,23 87,25 85,24 83,25 84,23 83,22 85,22" transform="scale(0.6)" opacity="0.7"/>
+  </g>
+
+  <!-- Brand Initial (subtle D+A monogram) -->
+  <g transform="translate(42, 42)" fill="rgba(255,255,255,0.15)" font-family="Arial, sans-serif" font-weight="bold">
+    <text x="0" y="6" font-size="8" text-anchor="middle">D</text>
+    <text x="8" y="6" font-size="8" text-anchor="middle">A</text>
+  </g>
+
+</svg>

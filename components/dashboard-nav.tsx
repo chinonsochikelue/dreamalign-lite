@@ -54,13 +54,13 @@ export function DashboardNav() {
     <>
       {/* Desktop Navigation */}
       <nav
-        className="hidden lg:flex fixed w-full z-50 bg-white/10 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
+        className="hidden lg:flex fixed w-full z-50"
       >
         <div
           className={`transition-all duration-500 border-b ease-out ${
             scrollY > 50
               ? "max-w-[95%] mx-auto mt-4 rounded-2xl px-2 md:px-8 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
-              : "w-full px-4 bg-transparent"
+              : "w-full px-4 bg-white/10 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
           }`}
         >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">

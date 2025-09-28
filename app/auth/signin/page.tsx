@@ -65,9 +65,11 @@ export default function SignInPage() {
             {/* Enhanced logo */}
             <div className="flex justify-center mb-6">
               <div className="relative group">
-                <div className="flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 rounded-md">
+                <Link href="/" className="cursor-pointer">
+                <div className="flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 rounded-md cursor-pointer">
                   <Image src="/logo.svg" alt="Logo" width={100} height={100} />
                 </div>
+                </Link>
 
                 {/* Orbiting elements */}
                 <div className="absolute -inset-4 opacity-30">

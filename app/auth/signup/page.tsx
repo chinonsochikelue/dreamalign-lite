@@ -98,9 +98,11 @@ export default function SignUpPage() {
             {/* Enhanced logo */}
             <div className="flex justify-center mb-6">
               <div className="relative group">
+                <Link href="/" className="cursor-pointer">
                 <div className="flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 rounded-md">
                   <Image src="/logo.svg" alt="Logo" width={100} height={100} />
                 </div>
+                </Link>
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-pink-500 to-yellow-500 rounded-full animate-pulse flex items-center justify-center">
                   <Sparkles className="w-3 h-3 text-white" />
                 </div>

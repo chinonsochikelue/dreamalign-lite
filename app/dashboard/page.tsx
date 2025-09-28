@@ -1,4 +1,5 @@
 "use client"
+import { useUser } from "@clerk/nextjs"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,6 @@ import {
   TrendingUp,
   Target,
   Clock,
-  Award,
   MessageSquare,
   Star,
   ArrowRight,
@@ -18,7 +18,6 @@ import {
   BarChart3,
   Zap,
   Calendar,
-  Users,
   BookOpen,
   Trophy,
   Activity,
@@ -27,11 +26,13 @@ import {
   Play,
   CheckCircle,
   ArrowUp,
-  TrendingDown
+  TrendingDown,
 } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { DashboardNav } from "@/components/dashboard-nav"
 
 export default function DashboardPage() {
+  const { user, isLoaded } = useUser()
   const [userStats, setUserStats] = useState({
     totalInterviews: 12,
     averageScore: 7.8,
@@ -210,36 +211,22 @@ export default function DashboardPage() {
     return rate > 0 ? <ArrowUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />
   }
 
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl mb-4 animate-pulse">
+            <Sparkles className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-slate-600 dark:text-slate-300">Loading your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Enhanced Navigation */}
-      <nav className="border-b border-white/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Career Companion
-                </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Your Career Journey</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300">
-                <Play className="w-4 h-4 mr-2" />
-                Start Interview
-              </Button>
-              <Button variant="outline" className="border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <BookOpen className="w-4 h-4 mr-2" />
-                Explore Careers
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <DashboardNav />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
@@ -250,7 +237,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 dark:from-white dark:via-blue-200 dark:to-purple-200 bg-clip-text text-transparent mb-4">
-            Welcome back, Alex!
+            Welcome back, {user?.firstName || "there"}!
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
             Ready to continue your career development journey? Let's track your progress and keep building those skills.
@@ -282,7 +269,10 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-1">Average Score</p>
-                  <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">{userStats.averageScore}<span className="text-lg">/10</span></p>
+                  <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">
+                    {userStats.averageScore}
+                    <span className="text-lg">/10</span>
+                  </p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center mt-1">
                     {getImprovementIcon(12)}
                     <span className="ml-1">+0.3 this month</span>
@@ -318,7 +308,10 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">Current Streak</p>
-                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">{userStats.streakDays}<span className="text-lg">d</span></p>
+                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">
+                    {userStats.streakDays}
+                    <span className="text-lg">d</span>
+                  </p>
                   <p className="text-xs text-orange-600 dark:text-orange-400">Keep it going!</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
@@ -331,11 +324,36 @@ export default function DashboardPage() {
 
         <Tabs defaultValue="overview" className="space-y-8">
           <TabsList className="grid w-full grid-cols-5 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-white/20 dark:border-slate-700/20 shadow-lg">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">Overview</TabsTrigger>
-            <TabsTrigger value="interviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">Interviews</TabsTrigger>
-            <TabsTrigger value="careers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">Career Paths</TabsTrigger>
-            <TabsTrigger value="progress" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">Progress</TabsTrigger>
-            <TabsTrigger value="achievements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">Achievements</TabsTrigger>
+            <TabsTrigger
+              value="overview"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="interviews"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+            >
+              Interviews
+            </TabsTrigger>
+            <TabsTrigger
+              value="careers"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+            >
+              Career Paths
+            </TabsTrigger>
+            <TabsTrigger
+              value="progress"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+            >
+              Progress
+            </TabsTrigger>
+            <TabsTrigger
+              value="achievements"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+            >
+              Achievements
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -351,7 +369,9 @@ export default function DashboardPage() {
                         </div>
                         Performance Trend
                       </CardTitle>
-                      <CardDescription className="text-slate-600 dark:text-slate-400">Your interview scores over time</CardDescription>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                        Your interview scores over time
+                      </CardDescription>
                     </CardHeader>
                   </div>
                   <CardContent className="p-6">
@@ -368,10 +388,10 @@ export default function DashboardPage() {
                             boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)",
                           }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="score" 
-                          stroke="#3b82f6" 
+                        <Line
+                          type="monotone"
+                          dataKey="score"
+                          stroke="#3b82f6"
                           strokeWidth={3}
                           dot={{ fill: "#3b82f6", strokeWidth: 2, r: 5 }}
                           activeDot={{ r: 7, fill: "#1d4ed8" }}
@@ -390,7 +410,9 @@ export default function DashboardPage() {
                       <Play className="w-8 h-8 text-white" />
                     </div>
                     <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">Ready for more?</h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Start another interview to improve your skills</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      Start another interview to improve your skills
+                    </p>
                     <Button className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
                       Start Interview
                     </Button>
@@ -404,7 +426,10 @@ export default function DashboardPage() {
                     </div>
                     <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">Explore Careers</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Discover new career opportunities</p>
-                    <Button variant="outline" className="w-full border-purple-300 dark:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                    <Button
+                      variant="outline"
+                      className="w-full border-purple-300 dark:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 bg-transparent"
+                    >
                       Browse Paths
                     </Button>
                   </CardContent>
@@ -423,7 +448,9 @@ export default function DashboardPage() {
                       </div>
                       Skills Breakdown
                     </CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">Your performance by skill area</CardDescription>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      Your performance by skill area
+                    </CardDescription>
                   </CardHeader>
                 </div>
                 <CardContent className="p-6">
@@ -450,7 +477,9 @@ export default function DashboardPage() {
                       </div>
                       Weekly Activity
                     </CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">Interviews completed this week</CardDescription>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      Interviews completed this week
+                    </CardDescription>
                   </CardHeader>
                 </div>
                 <CardContent className="p-6">
@@ -488,7 +517,11 @@ export default function DashboardPage() {
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {interviewHistory.slice(0, 3).map((interview, index) => (
-                    <div key={interview.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800/50 dark:to-slate-700/50 rounded-xl border border-slate-200/50 dark:border-slate-600/50 hover:shadow-md transition-all duration-200" style={{ animationDelay: `${index * 100}ms` }}>
+                    <div
+                      key={interview.id}
+                      className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800/50 dark:to-slate-700/50 rounded-xl border border-slate-200/50 dark:border-slate-600/50 hover:shadow-md transition-all duration-200"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
                       <div className="flex items-center space-x-4">
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                           <MessageSquare className="w-6 h-6 text-white" />
@@ -496,7 +529,9 @@ export default function DashboardPage() {
                         <div>
                           <h4 className="font-semibold text-slate-800 dark:text-slate-200">{interview.jobRole}</h4>
                           <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-                            <Badge variant="outline" className="text-xs">{interview.type}</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {interview.type}
+                            </Badge>
                             <span>•</span>
                             <span>{formatDate(interview.date)}</span>
                           </div>
@@ -524,7 +559,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Interview History</h2>
-                <p className="text-slate-600 dark:text-slate-400 mt-2">Track your progress and review past interviews</p>
+                <p className="text-slate-600 dark:text-slate-400 mt-2">
+                  Track your progress and review past interviews
+                </p>
               </div>
               <Button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg">
                 <Plus className="w-4 h-4 mr-2" />
@@ -534,7 +571,11 @@ export default function DashboardPage() {
 
             <div className="grid gap-4">
               {interviewHistory.map((interview, index) => (
-                <Card key={interview.id} className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300" style={{ animationDelay: `${index * 50}ms` }}>
+                <Card
+                  key={interview.id}
+                  className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
@@ -542,9 +583,16 @@ export default function DashboardPage() {
                           <MessageSquare className="w-7 h-7 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">{interview.jobRole}</h3>
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">
+                            {interview.jobRole}
+                          </h3>
                           <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">{interview.type}</Badge>
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                            >
+                              {interview.type}
+                            </Badge>
                             <span>•</span>
                             <span>{formatDate(interview.date)}</span>
                             <span>•</span>
@@ -554,10 +602,15 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <div className={`text-3xl font-bold ${getScoreColor(interview.score)} mb-1`}>{interview.score}/10</div>
+                          <div className={`text-3xl font-bold ${getScoreColor(interview.score)} mb-1`}>
+                            {interview.score}/10
+                          </div>
                           <p className="text-sm text-slate-500 dark:text-slate-400">Overall Score</p>
                         </div>
-                        <Button variant="outline" className="border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <Button
+                          variant="outline"
+                          className="border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent"
+                        >
                           View Details
                           <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
@@ -573,7 +626,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Your Career Paths</h2>
-                <p className="text-slate-600 dark:text-slate-400 mt-2">Explore and track your career development progress</p>
+                <p className="text-slate-600 dark:text-slate-400 mt-2">
+                  Explore and track your career development progress
+                </p>
               </div>
               <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg">
                 <Plus className="w-4 h-4 mr-2" />
@@ -583,7 +638,11 @@ export default function DashboardPage() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {careerPaths.map((path, index) => (
-                <Card key={path.id} className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105" style={{ animationDelay: `${index * 100}ms` }}>
+                <Card
+                  key={path.id}
+                  className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
                   <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-1">
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
@@ -634,20 +693,26 @@ export default function DashboardPage() {
                       </div>
                       Weekly Goals
                     </CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">Track your weekly learning objectives</CardDescription>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      Track your weekly learning objectives
+                    </CardDescription>
                   </CardHeader>
                 </div>
                 <CardContent className="p-6 space-y-6">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Complete 3 interviews</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        Complete 3 interviews
+                      </span>
                       <Badge variant="secondary">2/3</Badge>
                     </div>
                     <Progress value={67} className="h-3" />
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Explore 1 career path</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        Explore 1 career path
+                      </span>
                       <Badge className="bg-green-500 text-white">
                         <CheckCircle className="w-3 h-3 mr-1" />
                         Complete
@@ -657,7 +722,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Achieve 8+ average score</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        Achieve 8+ average score
+                      </span>
                       <Badge variant="outline">7.8/8.0</Badge>
                     </div>
                     <Progress value={97} className="h-3" />
@@ -674,7 +741,9 @@ export default function DashboardPage() {
                       </div>
                       Learning Streak
                     </CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">Keep up your consistent learning habit</CardDescription>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      Keep up your consistent learning habit
+                    </CardDescription>
                   </CardHeader>
                 </div>
                 <CardContent className="p-6">
@@ -711,7 +780,9 @@ export default function DashboardPage() {
                     </div>
                     Skill Development
                   </CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">Areas where you're improving</CardDescription>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                    Areas where you're improving
+                  </CardDescription>
                 </CardHeader>
               </div>
               <CardContent className="p-6">
@@ -764,7 +835,9 @@ export default function DashboardPage() {
           <TabsContent value="achievements" className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-2">Achievements</h2>
-              <p className="text-slate-600 dark:text-slate-400">Unlock rewards as you progress in your career journey</p>
+              <p className="text-slate-600 dark:text-slate-400">
+                Unlock rewards as you progress in your career journey
+              </p>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -772,19 +845,17 @@ export default function DashboardPage() {
                 <Card
                   key={achievement.id}
                   className={`border-0 transition-all duration-300 hover:scale-105 ${
-                    achievement.isUnlocked 
-                      ? "bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 shadow-xl" 
+                    achievement.isUnlocked
+                      ? "bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 shadow-xl"
                       : "bg-white/40 dark:bg-slate-800/40 opacity-60 shadow-lg"
                   }`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <CardContent className="p-6 text-center">
-                    <div className={`text-5xl mb-4 ${achievement.isUnlocked ? 'animate-bounce' : ''}`}>
+                    <div className={`text-5xl mb-4 ${achievement.isUnlocked ? "animate-bounce" : ""}`}>
                       {achievement.icon}
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-                      {achievement.title}
-                    </h3>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">{achievement.title}</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
                       {achievement.description}
                     </p>
@@ -808,9 +879,7 @@ export default function DashboardPage() {
 
         {/* Footer */}
         <div className="text-center mt-16 py-8">
-          <p className="text-slate-500 dark:text-slate-400">
-            Keep pushing forward on your career journey!
-          </p>
+          <p className="text-slate-500 dark:text-slate-400">Keep pushing forward on your career journey!</p>
         </div>
       </div>
     </div>

@@ -4,13 +4,9 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import {
   ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
 } from '@clerk/nextjs'
 import { ThemeProvider } from "@/provider/theme-provider"
+import { ConvexClientProvider } from "./ConvexClientProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,7 +29,6 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`} suppressHydrationWarning>
       <body className="bg-background text-foreground">
         <ThemeProvider
@@ -42,10 +37,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+    <ClerkProvider>
+          <ConvexClientProvider>
           {children}
+          </ConvexClientProvider>
+    </ClerkProvider>
         </ThemeProvider>
       </body>
     </html>
-    </ClerkProvider>
   )
 }

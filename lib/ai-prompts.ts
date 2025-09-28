@@ -23,13 +23,16 @@ Return as JSON array with this structure:
 `
 
 export const INTERVIEW_QUESTIONS_PROMPT = `
-Generate 5 interview questions for a {jobRole} position.
+Generate interview questions for a {jobRole} position.
 Questions should cover:
 - Technical skills
 - Problem-solving
 - Experience
 - Behavioral aspects
 - Industry knowledge
+- Challenges
+
+Provide 5-10 questions that are clear and concise.
 
 Return as JSON array of strings:
 ["Question 1?", "Question 2?", ...]

@@ -12,10 +12,10 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
 
     const emailData: EmailTemplate = {
       to: userEmail,
-      subject: "Welcome to Career Companion!",
+      subject: "Welcome to DreamAlign!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1a1a1a;">Welcome to Career Companion, ${userName}!</h1>
+          <h1 style="color: #1a1a1a;">Welcome to DreamAlign, ${userName}!</h1>
           <p>We're excited to help you on your career development journey.</p>
           <p>Here's what you can do next:</p>
           <ul>
@@ -23,7 +23,7 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
             <li>Explore personalized career paths</li>
             <li>Practice with our AI interview coach</li>
           </ul>
-          <a href="https://career-companion.vercel.app/onboarding" 
+          <a href="https://dreamalign-lite.vercel.app/onboarding" 
              style="background: #000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 20px 0;">
             Get Started
           </a>
@@ -63,7 +63,7 @@ export async function sendInterviewCompletionEmail(
             </p>
           </div>
           <p>Keep practicing to improve your interview skills!</p>
-          <a href="https://career-companion.vercel.app/dashboard" 
+          <a href="https://dreamalign-lite.vercel.app/dashboard" 
              style="background: #000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 20px 0;">
             View Dashboard
           </a>
@@ -98,7 +98,7 @@ export async function sendCareerRecommendationEmail(
             ${careerPaths.map((path) => `<li style="margin: 10px 0;">${path}</li>`).join("")}
           </ul>
           <p>Start exploring these paths and take your first interview practice!</p>
-          <a href="https://career-companion.vercel.app/career-paths" 
+          <a href="https://dreamalign-lite.vercel.app/career-paths" 
              style="background: #000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 20px 0;">
             Explore Career Paths
           </a>

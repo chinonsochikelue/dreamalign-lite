@@ -185,32 +185,36 @@ class Analytics {
       }
     }
 
-    // Send to Vercel Analytics with all enriched data
-    const enrichedProperties = {
-      ...properties,
+    // Send to Vercel Analytics with ONLY primitive values (no nested objects)
+    const vercelProperties: Record<string, string | number | boolean | null> = {
       userId: this.userId,
       sessionId: this.sessionId,
       timestamp: Date.now(),
-      page: page || (typeof window !== "undefined" ? window.location.pathname : undefined),
-      referrer: typeof window !== "undefined" ? document.referrer : undefined,
-      userAgent: typeof window !== "undefined" ? navigator.userAgent : undefined,
+      page: page || (typeof window !== "undefined" ? window.location.pathname : "unknown"),
       sessionDuration: Date.now() - this.sessionStartTime,
     }
 
-    track(event, enrichedProperties)
+    // Add only primitive properties from customProperties
+    Object.entries(customProperties).forEach(([key, val]) => {
+      if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' || val === null) {
+        vercelProperties[key] = val
+      }
+    })
+
+    track(event, vercelProperties)
 
     // Send to backend with schema-compliant properties
     this.sendToBackend(event, schemaCompliantProperties)
 
     // Log to console in development
     if (process.env.NODE_ENV === "development") {
-      console.log(`[Analytics] ${event}:`, enrichedProperties)
+      console.log(`[Analytics] ${event}:`, schemaCompliantProperties)
     }
 
-    // Store in localStorage for debugging
+    // Store in localStorage for debugging (keep full data here)
     if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
       const analyticsLog = JSON.parse(localStorage.getItem("analytics_log") || "[]")
-      analyticsLog.push({ event, properties: enrichedProperties, timestamp: new Date().toISOString() })
+      analyticsLog.push({ event, properties: schemaCompliantProperties, timestamp: new Date().toISOString() })
 
       // Keep only last 100 events
       if (analyticsLog.length > 100) {
@@ -232,7 +236,7 @@ class Analytics {
           eventType: event,
           eventName: event,
           properties,
-          userId: this.userId,
+          userId: this.userId || undefined, // Convert null to undefined
           sessionId: this.sessionId,
         }),
       })

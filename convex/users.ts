@@ -56,6 +56,23 @@ export const CreateNewUser = mutation({
   },
 })
 
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      return null
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first()
+
+    return user
+  },
+})
+
 export const getByEmail = query({
   args: { email: v.string() },
   handler: async (ctx, args) => {
@@ -77,6 +94,76 @@ export const updateInterests = mutation({
       profileCompleted: true,
       updatedAt: Date.now(),
     })
+  },
+})
+
+export const updateUserProfile = mutation({
+  args: {
+    name: v.optional(v.string()),
+    location: v.optional(v.string()),
+    bio: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error("Not authenticated")
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first()
+
+    if (!user) {
+      throw new Error("User not found")
+    }
+
+    await ctx.db.patch(user._id, {
+      ...args,
+      updatedAt: Date.now(),
+    })
+
+    return await ctx.db.get(user._id)
+  },
+})
+
+export const updateOnboardingData = mutation({
+  args: {
+    interests: v.optional(v.array(v.string())),
+    goals: v.optional(v.array(v.string())),
+    skills: v.optional(v.array(v.string())),
+    experienceLevel: v.optional(v.string()),
+    personalityTraits: v.optional(v.array(v.string())),
+    workPreferences: v.optional(
+      v.object({
+        remoteWork: v.optional(v.boolean()),
+        teamSize: v.optional(v.string()),
+        workEnvironment: v.optional(v.string()),
+        careerGoals: v.optional(v.array(v.string())),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error("Not authenticated")
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first()
+
+    if (!user) {
+      throw new Error("User not found")
+    }
+
+    await ctx.db.patch(user._id, {
+      ...args,
+      updatedAt: Date.now(),
+    })
+
+    return await ctx.db.get(user._id)
   },
 })
 

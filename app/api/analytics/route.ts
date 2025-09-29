@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     if (data.eventType === "ai_interaction") {
       await convex.mutation(api.analytics.trackAiEvent, {
-        userId: data.userId,
+        userId: data.userId || undefined, // Convert null to undefined
         sessionId: data.sessionId,
         aiProvider: data.properties?.provider || "unknown",
         model: data.properties?.model || "unknown",
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       await sendToScorecard(data)
     } else {
       await convex.mutation(api.analytics.trackEvent, {
-        userId: data.userId,
+        userId: data.userId || undefined, // Convert null to undefined
         sessionId: data.sessionId,
         eventType: data.eventType,
         eventName: data.eventName,
@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
 
       // Store beacon events in Convex
       await convex.mutation(api.analytics.trackEvent, {
-        userId: parsedData.userId || undefined,
+        userId: parsedData.userId || undefined, // Convert null to undefined
         sessionId: parsedData.sessionId || "beacon-session",
         eventType: "beacon",
         eventName: event,

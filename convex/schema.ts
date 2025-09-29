@@ -6,7 +6,9 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     imageUrl: v.string(),
+    bio: v.optional(v.string()),
     interests: v.optional(v.array(v.string())),
+    goals: v.optional(v.array(v.string())),
     profileCompleted: v.optional(v.boolean()),
     profilePicture: v.optional(v.string()),
     skills: v.optional(v.array(v.string())),
@@ -16,7 +18,16 @@ export default defineSchema({
     availabilityHours: v.optional(v.number()),
     onboardingStep: v.optional(v.number()),
     personalityType: v.optional(v.string()),
-    workPreferences: v.optional(v.array(v.string())),
+    personalityTraits: v.optional(v.array(v.string())),
+    workPreferences: v.optional(v.union(
+      v.array(v.string()),
+      v.object({
+        remoteWork: v.optional(v.boolean()),
+        teamSize: v.optional(v.string()),
+        workEnvironment: v.optional(v.string()),
+        careerGoals: v.optional(v.array(v.string())),
+      })
+    )),
     salaryExpectation: v.optional(
       v.object({
         min: v.number(),

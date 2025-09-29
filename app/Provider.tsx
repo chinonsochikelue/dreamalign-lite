@@ -1,35 +1,91 @@
-'use client'
-import React, { useEffect, useState } from "react";
-import { api } from '@/convex/_generated/api';
-import { useMutation } from "convex/react";
-import { useUser } from '@clerk/nextjs';
-import { UserDetailProvider } from "@/context/UserDetailContext";
-
+"use client"
+import { useEffect, useState } from "react"
+import { api } from "@/convex/_generated/api"
+import { useMutation, useQuery } from "convex/react"
+import { useUser } from "@clerk/nextjs"
+import { UserDetailProvider } from "@/context/UserDetailContext"
+import { setUser, trackEvent } from "@/lib/analytics"
 
 function Provider({ children }: any) {
-    const { user } = useUser();
-    const CreateUser = useMutation(api.users.CreateNewUser);
-    const [userDetail, setUserDetail] = useState<any>();
+  const { user } = useUser()
+  const CreateUser = useMutation(api.users.CreateNewUser)
+  const getUserByEmail = useQuery(
+    api.users.getByEmail,
+    user?.primaryEmailAddress?.emailAddress ? { email: user.primaryEmailAddress.emailAddress } : "skip",
+  )
+  const [userDetail, setUserDetail] = useState<any>()
+  const [isInitialized, setIsInitialized] = useState(false)
 
-    useEffect(() => {
-        user && CreateNewUser()
-    })
-    const CreateNewUser = async () => {
-        if (user) {
-            const result = await CreateUser({
-                email: user?.primaryEmailAddress?.emailAddress ?? '',
-                name: user?.fullName ?? '',
-                imageUrl: user?.imageUrl ?? '',
-            })
-            setUserDetail(result);
-        }
+  useEffect(() => {
+    if (user && !isInitialized) {
+      if (getUserByEmail) {
+        // User exists in database
+        setUserDetail(getUserByEmail)
+        setIsInitialized(true)
+        setUser(getUserByEmail._id, user.primaryEmailAddress?.emailAddress, {
+          name: user.fullName,
+          experienceLevel: getUserByEmail.experienceLevel,
+          interests: getUserByEmail.interests,
+          onboardingCompleted: getUserByEmail.profileCompleted,
+        })
+      } else if (getUserByEmail === null) {
+        // User doesn't exist, create new user
+        CreateNewUser()
+      }
     }
+  }, [user, getUserByEmail, isInitialized])
 
-    return (
-        <UserDetailProvider value={{ userDetail, setUserDetail }}>
-            <div>{children}</div>
-        </UserDetailProvider>
-    )
+  const CreateNewUser = async () => {
+    if (user && !isInitialized) {
+      try {
+        console.log("Creating new user:", user.primaryEmailAddress?.emailAddress)
+        trackEvent("user_registered", {
+          userEmail: user.primaryEmailAddress?.emailAddress,
+          userName: user.fullName,
+          registrationMethod: "clerk",
+        })
+
+        const result = await CreateUser({
+          email: user?.primaryEmailAddress?.emailAddress ?? "",
+          name: user?.fullName ?? "",
+          imageUrl: user?.imageUrl ?? "",
+        })
+        console.log("User created successfully:", result)
+        setUserDetail(result)
+        setIsInitialized(true)
+
+        setUser(result._id, user.primaryEmailAddress?.emailAddress, {
+          name: user.fullName,
+          isNewUser: true,
+        })
+
+        trackEvent("user_created", {
+          userId: result._id,
+          userEmail: user.primaryEmailAddress?.emailAddress,
+          userName: user.fullName,
+        })
+      } catch (error) {
+        console.error("Error creating user:", error)
+        trackEvent("error_occurred", {
+          errorMessage: error.message,
+          context: "user_creation",
+          userEmail: user.primaryEmailAddress?.emailAddress,
+        })
+
+        // If user creation fails, try to fetch existing user
+        if (getUserByEmail) {
+          setUserDetail(getUserByEmail)
+          setIsInitialized(true)
+        }
+      }
+    }
+  }
+
+  return (
+    <UserDetailProvider value={{ userDetail, setUserDetail }}>
+      <div>{children}</div>
+    </UserDetailProvider>
+  )
 }
 
-export default Provider;
+export default Provider

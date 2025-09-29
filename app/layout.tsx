@@ -2,11 +2,13 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
-import {
-  ClerkProvider,
-} from '@clerk/nextjs'
+import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/provider/theme-provider"
-import { ConvexClientProvider } from "./ConvexClientProvider";
+import { ConvexClientProvider } from "./ConvexClientProvider"
+import Provider from "./Provider"
+import { Analytics } from "@vercel/analytics/react"
+import { Suspense } from "react"
+import { AnalyticsDebug } from "@/components/analytics-debug"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,18 +33,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`} suppressHydrationWarning>
       <body className="bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-    <ClerkProvider>
-          <ConvexClientProvider>
-          {children}
-          </ConvexClientProvider>
-    </ClerkProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ClerkProvider>
+            <ConvexClientProvider>
+              <Suspense fallback={null}>
+                <Provider>{children}</Provider>
+              </Suspense>
+            </ConvexClientProvider>
+          </ClerkProvider>
         </ThemeProvider>
+        <Analytics />
+        <AnalyticsDebug />
       </body>
     </html>
   )

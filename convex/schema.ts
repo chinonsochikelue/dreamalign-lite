@@ -8,6 +8,24 @@ export default defineSchema({
     imageUrl: v.string(),
     interests: v.optional(v.array(v.string())),
     profileCompleted: v.optional(v.boolean()),
+    profilePicture: v.optional(v.string()),
+    skills: v.optional(v.array(v.string())),
+    experienceLevel: v.optional(v.string()),
+    careerGoals: v.optional(v.array(v.string())),
+    preferredLearningStyle: v.optional(v.string()),
+    availabilityHours: v.optional(v.number()),
+    onboardingStep: v.optional(v.number()),
+    personalityType: v.optional(v.string()),
+    workPreferences: v.optional(v.array(v.string())),
+    salaryExpectation: v.optional(
+      v.object({
+        min: v.number(),
+        max: v.number(),
+        currency: v.string(),
+      }),
+    ),
+    location: v.optional(v.string()),
+    remotePreference: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_email", ["email"]),
@@ -105,4 +123,69 @@ export default defineSchema({
     url: v.string(),
     scrapedAt: v.number(),
   }).index("by_skills", ["skills"]),
+
+  analyticsEvents: defineTable({
+    userId: v.optional(v.id("users")),
+    sessionId: v.string(),
+    eventType: v.string(),
+    eventName: v.string(),
+    properties: v.object({
+      page: v.optional(v.string()),
+      component: v.optional(v.string()),
+      action: v.optional(v.string()),
+      value: v.optional(v.any()),
+      metadata: v.optional(v.any()),
+    }),
+    timestamp: v.number(),
+    userAgent: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    referrer: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
+    .index("by_event_type", ["eventType"])
+    .index("by_timestamp", ["timestamp"]),
+
+  analyticsAiEvents: defineTable({
+    userId: v.optional(v.id("users")),
+    sessionId: v.string(),
+    aiProvider: v.string(),
+    model: v.string(),
+    eventType: v.union(
+      v.literal("generation_start"),
+      v.literal("generation_complete"),
+      v.literal("generation_error"),
+      v.literal("feedback_received"),
+    ),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    latency: v.optional(v.number()),
+    cost: v.optional(v.number()),
+    quality: v.optional(v.number()),
+    feedback: v.optional(v.string()),
+    timestamp: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_provider", ["aiProvider"])
+    .index("by_event_type", ["eventType"])
+    .index("by_timestamp", ["timestamp"]),
+
+  analyticsAlerts: defineTable({
+    alertType: v.union(
+      v.literal("error_spike"),
+      v.literal("performance_degradation"),
+      v.literal("user_drop_off"),
+      v.literal("ai_cost_spike"),
+    ),
+    severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("critical")),
+    message: v.string(),
+    data: v.any(),
+    resolved: v.boolean(),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    notificationsSent: v.array(v.string()),
+  })
+    .index("by_severity", ["severity"])
+    .index("by_resolved", ["resolved"]),
 })

@@ -8,6 +8,8 @@ const isProtectedRoute = createRouteMatcher([
   "/onboarding(.*)",
 ])
 
+const isOnboardingRoute = createRouteMatcher(["/onboarding(.*)"])
+
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect()

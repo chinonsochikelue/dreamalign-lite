@@ -1,6 +1,9 @@
 "use client"
 import { SignIn } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles } from "lucide-react"
 import Link from "next/link"
@@ -9,6 +12,12 @@ import Image from "next/image"
 export default function SignInPage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isVisible, setIsVisible] = useState(false)
+  const { user } = useUser()
+
+  const onboardingStatus = useQuery(
+    api.users.getOnboardingStatus,
+    user?.primaryEmailAddress?.emailAddress ? { email: user.primaryEmailAddress.emailAddress } : "skip",
+  )
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -23,6 +32,13 @@ export default function SignInPage() {
 
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
+
+  const getRedirectUrl = () => {
+    if (onboardingStatus?.exists && onboardingStatus?.profileCompleted) {
+      return "/dashboard"
+    }
+    return "/onboarding"
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-900 flex items-center justify-center px-4 overflow-hidden relative">
@@ -111,7 +127,7 @@ export default function SignInPage() {
                       "text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-semibold hover:underline transition-all duration-300",
                   },
                 }}
-                redirectUrl="/dashboard"
+                redirectUrl={getRedirectUrl()}
                 signUpUrl="/auth/signup"
               />
             </div>

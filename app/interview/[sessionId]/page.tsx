@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { 
-  Brain, 
-  Clock, 
-  MessageSquare, 
-  ArrowRight, 
-  CheckCircle, 
+import {
+  Brain,
+  Clock,
+  MessageSquare,
+  ArrowRight,
+  CheckCircle,
   Star,
   Pause,
   Play,
@@ -26,8 +26,9 @@ import {
   VolumeX,
   Bookmark,
   RotateCcw,
-  Zap
+  Zap,
 } from "lucide-react"
+import { useAnalytics } from "@/lib/analytics"
 
 interface Question {
   id: number
@@ -66,42 +67,42 @@ export default function EnhancedOriginalInterviewSessionPage() {
         question: "Tell me about yourself and why you're interested in this role.",
         isAnswered: false,
         difficulty: "Easy",
-        category: "Behavioral"
+        category: "Behavioral",
       },
       {
         id: 2,
         question: "Describe a challenging project you worked on and how you overcame obstacles.",
         isAnswered: false,
         difficulty: "Medium",
-        category: "Behavioral"
+        category: "Behavioral",
       },
       {
         id: 3,
         question: "How do you handle conflicts in a team environment?",
         isAnswered: false,
         difficulty: "Medium",
-        category: "Behavioral"
+        category: "Behavioral",
       },
       {
         id: 4,
         question: "What's your experience with modern JavaScript frameworks?",
         isAnswered: false,
         difficulty: "Medium",
-        category: "Technical"
+        category: "Technical",
       },
       {
         id: 5,
         question: "Where do you see yourself in 5 years?",
         isAnswered: false,
         difficulty: "Easy",
-        category: "Career Goals"
-      }
+        category: "Career Goals",
+      },
     ],
     currentQuestionIndex: 0,
     isCompleted: false,
-    isPaused: false
+    isPaused: false,
   })
-  
+
   const [currentAnswer, setCurrentAnswer] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -112,10 +113,14 @@ export default function EnhancedOriginalInterviewSessionPage() {
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [wordCount, setWordCount] = useState(0)
   const [savedDraft, setSavedDraft] = useState("")
+  const analytics = useAnalytics()
 
   // Calculate word count
   useEffect(() => {
-    const words = currentAnswer.trim().split(/\s+/).filter(word => word.length > 0).length
+    const words = currentAnswer
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length
     setWordCount(currentAnswer.trim() === "" ? 0 : words)
   }, [currentAnswer])
 
@@ -124,11 +129,19 @@ export default function EnhancedOriginalInterviewSessionPage() {
     if (session.isPaused || session.isCompleted || isLoading) return
 
     const timer = setInterval(() => {
-      setTimeElapsed(prev => prev + 1)
+      setTimeElapsed((prev) => prev + 1)
     }, 1000)
 
     return () => clearInterval(timer)
   }, [session.isPaused, session.isCompleted, isLoading])
+
+  useEffect(() => {
+    analytics.trackInterviewStarted(session.interviewType, session.difficulty)
+  }, [])
+
+  useEffect(() => {
+    setQuestionStartTime(Date.now())
+  }, [session.currentQuestionIndex])
 
   const handleSubmitAnswer = async () => {
     if (!currentAnswer.trim()) return
@@ -136,12 +149,25 @@ export default function EnhancedOriginalInterviewSessionPage() {
     setIsSubmitting(true)
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000)
 
+    analytics.trackQuestionAnswered(
+      session.currentQuestionIndex,
+      session.questions[session.currentQuestionIndex].category || "general",
+      timeSpent,
+    )
+
     // Simulate AI evaluation
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
     // Mock evaluation based on answer length and content
     const mockScore = Math.floor(Math.random() * 3) + 7 // 7-10 score
     const mockFeedback = generateMockFeedback(currentAnswer, session.questions[session.currentQuestionIndex].category)
+
+    analytics.trackQuestionAnswered(
+      session.currentQuestionIndex,
+      session.questions[session.currentQuestionIndex].category || "general",
+      timeSpent,
+      mockScore,
+    )
 
     const currentQuestion = session.questions[session.currentQuestionIndex]
     const updatedQuestions = [...session.questions]
@@ -151,7 +177,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
       feedback: mockFeedback,
       score: mockScore,
       isAnswered: true,
-      timeSpent
+      timeSpent,
     }
 
     const updatedSession = {
@@ -166,23 +192,30 @@ export default function EnhancedOriginalInterviewSessionPage() {
     setShowHints(false)
 
     // Store in localStorage for persistence
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.setItem(`interview_session`, JSON.stringify(updatedSession))
     }
 
     // Auto-advance after showing feedback
     setTimeout(() => {
       if (session.currentQuestionIndex < session.questions.length - 1) {
-        setSession(prev => ({
+        setSession((prev) => ({
           ...prev,
-          currentQuestionIndex: prev.currentQuestionIndex + 1
+          currentQuestionIndex: prev.currentQuestionIndex + 1,
         }))
         setQuestionStartTime(Date.now())
       } else {
         // Interview completed
         const completedSession = { ...updatedSession, isCompleted: true }
         setSession(completedSession)
-        if (typeof window !== 'undefined') {
+
+        const averageScore =
+          completedSession.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+          completedSession.questions.length
+
+        analytics.trackInterviewCompleted(completedSession.questions.length, averageScore, timeElapsed)
+
+        if (typeof window !== "undefined") {
           localStorage.setItem(`interview_session`, JSON.stringify(completedSession))
         }
       }
@@ -194,18 +227,18 @@ export default function EnhancedOriginalInterviewSessionPage() {
       Behavioral: [
         "Good use of specific examples. Consider structuring your response using the STAR method for even stronger impact.",
         "Your answer shows good self-awareness. Adding more quantifiable results would strengthen your response.",
-        "Nice personal touch in your answer. Consider expanding on the skills you demonstrated in this situation."
+        "Nice personal touch in your answer. Consider expanding on the skills you demonstrated in this situation.",
       ],
       Technical: [
         "Solid technical knowledge demonstrated. Consider discussing trade-offs between different approaches.",
         "Good explanation of concepts. Adding real-world examples of implementation would enhance your answer.",
-        "Shows understanding of the fundamentals. Discussing recent trends or updates would show continued learning."
+        "Shows understanding of the fundamentals. Discussing recent trends or updates would show continued learning.",
       ],
       "Career Goals": [
         "Clear vision for your future. Consider connecting your goals more directly to this specific role.",
         "Good forward-thinking approach. Adding specific steps you're taking to achieve these goals would strengthen your answer.",
-        "Realistic and thoughtful goals. Consider mentioning how this role fits into your broader career strategy."
-      ]
+        "Realistic and thoughtful goals. Consider mentioning how this role fits into your broader career strategy.",
+      ],
     }
 
     const categoryFeedback = feedbackOptions[category as keyof typeof feedbackOptions] || feedbackOptions.Behavioral
@@ -213,14 +246,14 @@ export default function EnhancedOriginalInterviewSessionPage() {
   }
 
   const handlePauseResume = () => {
-    setSession(prev => ({ ...prev, isPaused: !prev.isPaused }))
+    setSession((prev) => ({ ...prev, isPaused: !prev.isPaused }))
   }
 
   const handleSkipQuestion = () => {
     if (session.currentQuestionIndex < session.questions.length - 1) {
-      setSession(prev => ({
+      setSession((prev) => ({
         ...prev,
-        currentQuestionIndex: prev.currentQuestionIndex + 1
+        currentQuestionIndex: prev.currentQuestionIndex + 1,
       }))
       setCurrentAnswer("")
       setQuestionStartTime(Date.now())
@@ -256,16 +289,21 @@ export default function EnhancedOriginalInterviewSessionPage() {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty?.toLowerCase()) {
-      case "easy": return "bg-green-100 text-green-700 border-green-200"
-      case "medium": return "bg-yellow-100 text-yellow-700 border-yellow-200"
-      case "hard": return "bg-red-100 text-red-700 border-red-200"
-      default: return "bg-slate-100 text-slate-700 border-slate-200"
+      case "easy":
+        return "bg-green-100 text-green-700 border-green-200"
+      case "medium":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200"
+      case "hard":
+        return "bg-red-100 text-red-700 border-red-200"
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200"
     }
   }
 
   const currentQuestion = session.questions[session.currentQuestionIndex]
-  const progress = ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
-  const completedQuestions = session.questions.filter(q => q.isAnswered).length
+  const progress =
+    ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
+  const completedQuestions = session.questions.filter((q) => q.isAnswered).length
 
   if (isLoading) {
     return (
@@ -280,9 +318,10 @@ export default function EnhancedOriginalInterviewSessionPage() {
   }
 
   if (session.isCompleted) {
-    const averageScore = completedQuestions > 0 
-      ? session.questions.filter(q => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions
-      : 0
+    const averageScore =
+      completedQuestions > 0
+        ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions
+        : 0
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -296,7 +335,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
               <p className="text-xl text-slate-600 mb-8 max-w-lg mx-auto">
                 Congratulations! You've successfully completed your {session.jobRole} interview session.
               </p>
-              
+
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-6 mb-8 max-w-md mx-auto">
                 <div className="text-center p-4 bg-slate-50 rounded-xl">
@@ -314,16 +353,16 @@ export default function EnhancedOriginalInterviewSessionPage() {
                   <p className="text-sm text-slate-600">Avg Score</p>
                 </div>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
                 >
                   View Detailed Results
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <Button size="lg" variant="outline" className="px-8">
+                <Button size="lg" variant="outline" className="px-8 bg-transparent">
                   Practice Again
                   <RotateCcw className="ml-2 w-4 h-4" />
                 </Button>
@@ -354,7 +393,9 @@ export default function EnhancedOriginalInterviewSessionPage() {
                   {session.isPaused && (
                     <>
                       <span>•</span>
-                      <Badge variant="secondary" className="text-xs">Paused</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        Paused
+                      </Badge>
                     </>
                   )}
                 </p>
@@ -365,9 +406,9 @@ export default function EnhancedOriginalInterviewSessionPage() {
                 <Button variant="outline" size="sm" onClick={handlePauseResume}>
                   {session.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSoundEnabled(!soundEnabled)}
                   className="text-slate-600"
                 >
@@ -423,12 +464,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                     >
                       <Lightbulb className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSkipQuestion}
-                      className="text-slate-600"
-                    >
+                    <Button variant="ghost" size="sm" onClick={handleSkipQuestion} className="text-slate-600">
                       <SkipForward className="w-4 h-4" />
                     </Button>
                   </div>
@@ -436,9 +472,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="mb-6">
-                  <p className="text-xl text-slate-800 leading-relaxed">
-                    {currentQuestion.question}
-                  </p>
+                  <p className="text-xl text-slate-800 leading-relaxed">{currentQuestion.question}</p>
                 </div>
 
                 {showHints && (
@@ -485,9 +519,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                           </>
                         )}
                       </CardTitle>
-                      <CardDescription>
-                        Take your time and provide a thoughtful, detailed answer
-                      </CardDescription>
+                      <CardDescription>Take your time and provide a thoughtful, detailed answer</CardDescription>
                     </div>
                     {session.sessionType === "voice" && (
                       <Button
@@ -505,26 +537,29 @@ export default function EnhancedOriginalInterviewSessionPage() {
                 <CardContent className="space-y-4">
                   {session.sessionType === "voice" ? (
                     <div className="text-center py-16">
-                      <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
-                        isRecording 
-                          ? "bg-red-100 border-4 border-red-300 animate-pulse shadow-lg" 
-                          : "bg-slate-100 border-4 border-slate-300 hover:bg-slate-200"
-                      }`}>
+                      <div
+                        className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
+                          isRecording
+                            ? "bg-red-100 border-4 border-red-300 animate-pulse shadow-lg"
+                            : "bg-slate-100 border-4 border-slate-300 hover:bg-slate-200"
+                        }`}
+                      >
                         <Mic className={`w-8 h-8 ${isRecording ? "text-red-600" : "text-slate-600"}`} />
                       </div>
                       <h3 className="text-xl font-semibold text-slate-900 mb-2">
                         {isRecording ? "Recording your response..." : "Ready to record"}
                       </h3>
                       <p className="text-slate-600 mb-6">
-                        {isRecording 
-                          ? "Speak clearly and at a natural pace. Click stop when finished." 
-                          : "Click the record button above to start speaking your answer"
-                        }
+                        {isRecording
+                          ? "Speak clearly and at a natural pace. Click stop when finished."
+                          : "Click the record button above to start speaking your answer"}
                       </p>
                       {isRecording && (
                         <div className="flex items-center justify-center space-x-2 text-red-600">
                           <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-                          <span className="text-sm font-mono">{formatTime(Math.floor((Date.now() - questionStartTime) / 1000))}</span>
+                          <span className="text-sm font-mono">
+                            {formatTime(Math.floor((Date.now() - questionStartTime) / 1000))}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -547,7 +582,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center space-x-4 text-slate-500">
                           <span>{currentAnswer.length} characters</span>
@@ -578,10 +613,10 @@ export default function EnhancedOriginalInterviewSessionPage() {
                       </div>
                     </>
                   )}
-                  
+
                   <div className="flex justify-end pt-4">
-                    <Button 
-                      onClick={handleSubmitAnswer} 
+                    <Button
+                      onClick={handleSubmitAnswer}
                       disabled={(!currentAnswer.trim() && !isRecording) || isSubmitting || session.isPaused}
                       size="lg"
                       className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
@@ -634,7 +669,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                       <p className="text-sm text-slate-600 font-medium">Response Time</p>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-6">
                     <div className="flex items-start space-x-3 mb-4">
                       <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -684,7 +719,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                       }`}
                       onClick={() => {
                         if (q.isAnswered || index === session.currentQuestionIndex) {
-                          setSession(prev => ({ ...prev, currentQuestionIndex: index }))
+                          setSession((prev) => ({ ...prev, currentQuestionIndex: index }))
                           setCurrentAnswer("")
                           setQuestionStartTime(Date.now())
                         }
@@ -698,9 +733,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
                           <span className="text-xs text-slate-500">{q.difficulty}</span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-700 mt-1 line-clamp-2">
-                        {q.question}
-                      </p>
+                      <p className="text-sm text-slate-700 mt-1 line-clamp-2">{q.question}</p>
                     </div>
                   ))}
                 </div>
@@ -730,15 +763,20 @@ export default function EnhancedOriginalInterviewSessionPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-600">Avg. Score</span>
-                  <span className={`font-medium ${getScoreColor(
-                    completedQuestions > 0 
-                      ? session.questions.filter(q => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions
-                      : 0
-                  )}`}>
-                    {completedQuestions > 0 
-                      ? (session.questions.filter(q => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions).toFixed(1)
-                      : "N/A"
-                    }
+                  <span
+                    className={`font-medium ${getScoreColor(
+                      completedQuestions > 0
+                        ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+                            completedQuestions
+                        : 0,
+                    )}`}
+                  >
+                    {completedQuestions > 0
+                      ? (
+                          session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+                          completedQuestions
+                        ).toFixed(1)
+                      : "N/A"}
                   </span>
                 </div>
               </CardContent>

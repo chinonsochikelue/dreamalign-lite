@@ -130,7 +130,7 @@ export default function SignUpPage() {
                       "text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-semibold hover:underline transition-all duration-300",
                   },
                 }}
-                redirectUrl="/dashboard"
+                redirectUrl="/onboarding"
                 signInUrl="/auth/signin"
               />
             </div>

@@ -3,7 +3,9 @@ import { scrapeJobs, scrapeCourses } from "@/lib/integrations/firecrawl"
 import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+// Create Convex client only if URL is configured
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
+const convex = convexUrl ? new ConvexHttpClient(convexUrl) : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,6 +42,18 @@ export async function POST(request: NextRequest) {
     // Store in Convex database
     let jobIds = []
     let courseIds = []
+
+    // If Convex is not configured, return scraped data without storing
+    if (!convex) {
+      return NextResponse.json({
+        success: true,
+        jobsScraped: allJobs.length,
+        coursesScraped: allCourses.length,
+        note: "Convex not configured, data not stored",
+        jobs: allJobs,
+        courses: allCourses,
+      })
+    }
 
     if (allJobs.length > 0) {
       try {

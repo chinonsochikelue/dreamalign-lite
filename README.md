@@ -1,40 +1,149 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# DreamAlign Lite - AI-Powered Career Development Platform
 
-## Getting Started
+## Project Overview
+DreamAlign Lite is a Next.js 15 application that provides AI-powered career development tools including personalized dashboards, AI interview practice, and career path recommendations.
 
-First, run the development server:
+## Tech Stack
+- **Frontend**: Next.js 15 with React 18, TypeScript, TailwindCSS
+- **Backend**: Convex (real-time database and serverless functions)
+- **Authentication**: Clerk (keyless development mode supported)
+- **AI Integrations**: OpenAI and Google Gemini (via AI SDK)
+- **Analytics**: Vercel Analytics, Custom analytics tracking
+- **Additional Services**: Firecrawl (web scraping), Resend (email), Scorecard (AI analytics)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Project Structure
+
+```
+├── app/                          # Next.js App Router
+│   ├── api/                     # API routes
+│   │   ├── analytics/           # Analytics tracking endpoint
+│   │   └── scrape/              # Web scraping endpoints
+│   ├── dashboard/               # Dashboard page
+│   ├── profile/                 # Profile page
+│   ├── interview/               # AI Interview page
+│   ├── ConvexClientProvider.tsx # Convex setup with fallback UI
+│   └── Provider.tsx             # Global providers wrapper
+├── lib/                         # Utility libraries
+│   ├── integrations/            # Third-party integrations
+│   │   ├── openai.ts           # OpenAI integration
+│   │   ├── gemini.ts           # Google Gemini integration
+│   │   └── firecrawl.ts        # Web scraping integration
+│   ├── ai-provider.ts          # AI provider utilities
+│   ├── analytics.ts            # Analytics tracking
+│   └── convex.tsx              # Convex client utilities
+├── convex/                      # Convex backend schema
+├── components/                  # React components
+└── middleware.ts               # Next.js middleware with auth handling
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Current Status
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+### Working Features
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+- ✅ Next.js development server running on port 3000
+- ✅ Homepage loads successfully with branding and navigation
+- ✅ Dashboard page loads with loading state
+- ✅ Profile page loads with loading state
+- ✅ Interview page compiles successfully
+- ✅ Analytics tracking functional (with local fallback)
+- ✅ Clerk authentication in keyless development mode
+- ✅ Convex integration with graceful fallback
+- ✅ No critical TypeScript errors
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+### Requires Configuration (Optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+⚠️ **Clerk Authentication**: Currently in keyless mode. For full auth features:
+  - Visit the Clerk dashboard URL shown in console
+  - Claim your development keys
+  - Add them to `.env.local`
 
-## Learn More
+⚠️ **Convex Database**: Backend database is configured but can be reconfigured:
+  - Run `npx convex dev` to set up or switch deployments
 
-To learn more about Next.js, take a look at the following resources:
+⚠️ **AI Features**: API keys are configured in `.env.local` for:
+  - OpenAI (for GPT models)
+  - Google Gemini (for Gemini models)
+  - Services will fallback to mock data if keys are invalid
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+## Development Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Start development server
+npm run dev
 
-## Deploy on Vercel
+# Build for production
+npm run build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Start production server
+npm start
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+# Set up Convex (if needed)
+npx convex dev
+
+# Type checking
+npx tsc --noEmit
+```
+
+## Environment Variables
+
+Key environment variables in `.env.local`:
+
+```bash
+# Convex
+NEXT_PUBLIC_CONVEX_URL=
+CONVEX_DEPLOYMENT=
+
+# Clerk (commented out for keyless mode)
+# NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+# CLERK_SECRET_KEY=...
+
+# URLs
+NEXT_PUBLIC_CLERK_SIGNIN_URL=/auth/signin
+NEXT_PUBLIC_CLERK_SIGNUP_URL=/auth/signup
+NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/onboarding
+
+# Optional Services
+RESEND_API_KEY=...
+SCORECARD_API_KEY=...
+FIRECRAWL_API_KEY=...
+```
+
+
+## User Preferences
+
+- Clean, minimal error handling with user-friendly messages
+- Development-first approach with production-ready fallbacks
+- Graceful degradation when services are unavailable
+
+## Architecture Decisions
+
+### Why Graceful Degradation?
+The application is designed to work even when external services (Convex, Clerk, AI APIs) are not configured. This enables:
+- Faster onboarding for new developers
+- Testing without full service setup
+- Resilience against service outages
+
+### Why Keyless Clerk Mode?
+Clerk's keyless mode allows development without managing secret keys, making it easier to test authentication flows and UI components.
+
+### Why Turbopack?
+Next.js 15 uses Turbopack by default for faster development builds and hot module replacement.
+
+## Future Improvements
+
+- Add proper error boundaries for better error handling
+- Implement comprehensive test coverage
+- Add Storybook for component documentation
+- Set up CI/CD pipeline for automated deployments
+- Add proper logging and monitoring for production
+
+## Support & Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Convex Documentation](https://docs.convex.dev)
+- [Clerk Documentation](https://clerk.com/docs)
+
+---
+
+*Last Updated: September 29, 2025*

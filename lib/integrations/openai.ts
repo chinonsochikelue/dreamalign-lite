@@ -1,7 +1,19 @@
 import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+
+// Configure OpenAI provider with API key
+const openai = process.env.OPENAI_API_KEY
+  ? createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null
 
 // Real OpenAI integration using AI SDK
 export async function analyzeCareerInterests(interests: string[]): Promise<any[]> {
+  // If no API key is configured, return fallback data
+  if (!openai) {
+    console.warn("OpenAI API key not configured, using fallback data")
+    return getFallbackCareerPaths(interests)
+  }
+
   try {
     const prompt = `
 You are a career counselor AI. Based on the user's interests: ${interests.join(", ")}, 
@@ -27,7 +39,7 @@ Return as JSON array with this structure:
 `
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt,
       temperature: 0.7,
     })
@@ -35,21 +47,16 @@ Return as JSON array with this structure:
     return JSON.parse(text)
   } catch (error) {
     console.error("Error analyzing career interests:", error)
-    // Fallback to mock data
-    return [
-      {
-        title: "Full Stack Developer",
-        description: "Build end-to-end web applications using modern frameworks and technologies.",
-        matchScore: 95,
-        skills: ["JavaScript", "React", "Node.js", "TypeScript", "SQL", "Git"],
-        jobTitles: ["Full Stack Developer", "Software Engineer", "Web Developer"],
-        salaryRange: { min: 75000, max: 130000, currency: "USD" },
-      },
-    ]
+    return getFallbackCareerPaths(interests)
   }
 }
 
 export async function generateInterviewQuestions(jobRole: string, interviewType: string): Promise<string[]> {
+  if (!openai) {
+    console.warn("OpenAI API key not configured, using fallback questions")
+    return getFallbackQuestions(jobRole, interviewType)
+  }
+
   try {
     const prompt = `
 Generate 5 interview questions for a ${jobRole} position.
@@ -67,7 +74,7 @@ Return as JSON array of strings:
 `
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt,
       temperature: 0.8,
     })
@@ -75,14 +82,7 @@ Return as JSON array of strings:
     return JSON.parse(text)
   } catch (error) {
     console.error("Error generating interview questions:", error)
-    // Fallback questions
-    return [
-      "Tell me about yourself and your background.",
-      "Why are you interested in this role?",
-      "What are your greatest strengths?",
-      "Describe a challenging situation you faced and how you handled it.",
-      "Where do you see yourself in 5 years?",
-    ]
+    return getFallbackQuestions(jobRole, interviewType)
   }
 }
 
@@ -91,6 +91,11 @@ export async function evaluateInterviewAnswer(
   answer: string,
   jobRole: string,
 ): Promise<{ score: number; feedback: string }> {
+  if (!openai) {
+    console.warn("OpenAI API key not configured, using fallback evaluation")
+    return getFallbackEvaluation(answer)
+  }
+
   try {
     const prompt = `
 You are an interview coach. Evaluate this answer and provide constructive feedback.
@@ -111,7 +116,7 @@ Return as JSON:
 `
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt,
       temperature: 0.3,
     })
@@ -119,10 +124,48 @@ Return as JSON:
     return JSON.parse(text)
   } catch (error) {
     console.error("Error evaluating answer:", error)
-    // Fallback evaluation
-    return {
-      score: 7.5,
-      feedback: "Good answer with solid content. Consider adding more specific examples to strengthen your response.",
-    }
+    return getFallbackEvaluation(answer)
+  }
+}
+
+// Fallback functions when API is not available
+function getFallbackCareerPaths(interests: string[]): any[] {
+  return [
+    {
+      title: "Full Stack Developer",
+      description: "Build end-to-end web applications using modern frameworks and technologies.",
+      matchScore: 95,
+      skills: ["JavaScript", "React", "Node.js", "TypeScript", "SQL", "Git"],
+      jobTitles: ["Full Stack Developer", "Software Engineer", "Web Developer"],
+      salaryRange: { min: 75000, max: 130000, currency: "USD" },
+    },
+    {
+      title: "AI/ML Engineer",
+      description: "Design and implement machine learning models and AI systems.",
+      matchScore: 90,
+      skills: ["Python", "TensorFlow", "PyTorch", "Machine Learning", "Deep Learning"],
+      jobTitles: ["AI Engineer", "Machine Learning Engineer", "Data Scientist"],
+      salaryRange: { min: 90000, max: 160000, currency: "USD" },
+    },
+  ]
+}
+
+function getFallbackQuestions(jobRole: string, interviewType: string): string[] {
+  return [
+    "Tell me about yourself and your background.",
+    "Why are you interested in this role?",
+    "What are your greatest strengths?",
+    "Describe a challenging situation you faced and how you handled it.",
+    "Where do you see yourself in 5 years?",
+  ]
+}
+
+function getFallbackEvaluation(answer: string): { score: number; feedback: string } {
+  const answerLength = answer.length
+  const score = answerLength > 200 ? 8 : answerLength > 100 ? 7 : 6
+  
+  return {
+    score,
+    feedback: "Good answer with solid content. Consider adding more specific examples to strengthen your response.",
   }
 }

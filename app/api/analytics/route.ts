@@ -2,7 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+// Create Convex client only if URL is configured
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
+const convex = convexUrl ? new ConvexHttpClient(convexUrl) : null
 
 async function sendToScorecard(data: any) {
   if (!process.env.SCORECARD_API_KEY) {
@@ -84,6 +86,12 @@ export async function POST(request: NextRequest) {
     }
 
     // console.log("[Analytics] Received event:", data)
+
+    // If Convex is not configured, just log and return success
+    if (!convex) {
+      console.log("[Analytics] Convex not configured, event logged locally:", data.eventType)
+      return NextResponse.json({ success: true, note: "Convex not configured" })
+    }
 
     if (data.eventType === "ai_interaction") {
       await convex.mutation(api.analytics.trackAiEvent, {

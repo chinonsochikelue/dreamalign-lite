@@ -155,17 +155,17 @@ export default function ProfilePage() {
       analytics.track("profile_viewed", {
         userId: user._id,
         profileCompleteness: Math.round(
-          (((editedProfile.interests.length > 0 ? 1 : 0) +
-            (editedProfile.goals.length > 0 ? 1 : 0) +
-            (editedProfile.skills.length > 0 ? 1 : 0) +
-            (editedProfile.bio ? 1 : 0) +
-            (editedProfile.experienceLevel ? 1 : 0)) /
+          (((user.interests?.length > 0 ? 1 : 0) +
+            (user.goals?.length > 0 ? 1 : 0) +
+            (user.skills?.length > 0 ? 1 : 0) +
+            (user.bio ? 1 : 0) +
+            (user.experienceLevel ? 1 : 0)) /
             5) *
             100,
         ),
       })
     }
-  }, [user, editedProfile, analytics])
+  }, [user, analytics])
 
   const handleSave = async () => {
     const changedFields = []

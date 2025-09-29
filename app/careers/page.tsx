@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { OnboardingGuard } from "@/components/onboarding-guard"
 import { DashboardNav } from "@/components/dashboard-nav"
+import { scrapeJobsClient } from "@/lib/scraping-client"
 import {
   Search,
   TrendingUp,
@@ -72,6 +73,9 @@ export default function CareersPage() {
   const [selectedSalary, setSelectedSalary] = useState("all")
   const [selectedCareer, setSelectedCareer] = useState(null)
 
+  const [liveJobs, setLiveJobs] = useState([])
+  const [isScrapingJobs, setIsScrapingJobs] = useState(false)
+
   const getUserByEmail = useQuery(
     api.users.getByEmail,
     user?.primaryEmailAddress?.emailAddress ? { email: user.primaryEmailAddress.emailAddress } : "skip",
@@ -84,8 +88,7 @@ export default function CareersPage() {
 
   const generateCareerPaths = useMutation(api.users.generateCareerPaths)
 
-  // Enhanced career paths with more detailed information
-  const [allCareerPaths, setAllCareerPaths] = useState([
+  const allCareerPaths = [
     {
       id: "full-stack-dev",
       title: "Full Stack Developer",
@@ -402,14 +405,13 @@ export default function CareersPage() {
         "Plan disaster recovery strategies",
       ],
     },
-  ])
+  ]
 
   const [filteredCareers, setFilteredCareers] = useState(allCareerPaths)
 
   useEffect(() => {
     let filtered = allCareerPaths
 
-    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(
         (career) =>
@@ -419,17 +421,14 @@ export default function CareersPage() {
       )
     }
 
-    // Filter by category
     if (selectedCategory !== "all") {
       filtered = filtered.filter((career) => career.category === selectedCategory)
     }
 
-    // Filter by experience level
     if (selectedLevel !== "all") {
       filtered = filtered.filter((career) => career.experienceLevel === selectedLevel)
     }
 
-    // Filter by salary range
     if (selectedSalary !== "all") {
       const [min, max] = selectedSalary.split("-").map((s) => {
         if (s.includes("+")) return [Number.parseInt(s.replace("k+", "000")), Number.POSITIVE_INFINITY]
@@ -443,7 +442,6 @@ export default function CareersPage() {
       }
     }
 
-    // Sort by match score
     filtered.sort((a, b) => b.matchScore - a.matchScore)
 
     setFilteredCareers(filtered)
@@ -469,13 +467,36 @@ export default function CareersPage() {
     return "text-slate-600 dark:text-slate-400"
   }
 
+  const scrapeLiveJobs = async (career) => {
+    setIsScrapingJobs(true)
+    try {
+      const jobs = await scrapeJobsClient({
+        interests: [career.category],
+        skills: career.skills.slice(0, 3),
+        experienceLevel: career.experienceLevel,
+        location: "Remote",
+        jobTitle: career.title,
+      })
+      setLiveJobs(jobs.slice(0, 8))
+    } catch (error) {
+      console.error("Failed to scrape jobs:", error)
+      setLiveJobs([])
+    } finally {
+      setIsScrapingJobs(false)
+    }
+  }
+
+  const handleCareerSelect = (career) => {
+    setSelectedCareer(career)
+    scrapeLiveJobs(career)
+  }
+
   return (
     <OnboardingGuard>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <DashboardNav />
 
         <div className="max-w-7xl mx-auto pt-20 px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
           <div className="text-center mb-12">
             <div className="relative inline-block mb-6">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl">
@@ -490,7 +511,6 @@ export default function CareersPage() {
             </p>
           </div>
 
-          {/* Search and Filters */}
           <Card className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl mb-8">
             <CardContent className="p-6">
               <div className="grid md:grid-cols-4 gap-4">
@@ -544,7 +564,6 @@ export default function CareersPage() {
           </Card>
 
           {selectedCareer ? (
-            /* Career Detail View */
             <div className="space-y-8">
               <Button onClick={() => setSelectedCareer(null)} variant="outline" className="mb-4">
                 ← Back to Career List
@@ -734,6 +753,82 @@ export default function CareersPage() {
                           </Card>
                         ))}
                       </div>
+
+                      <div className="mt-8">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center">
+                            <Briefcase className="w-5 h-5 mr-2 text-green-500" />
+                            Live Job Openings
+                            <Badge className="ml-2 bg-green-500 text-white">Real-time</Badge>
+                          </h3>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => scrapeLiveJobs(selectedCareer)}
+                            disabled={isScrapingJobs}
+                          >
+                            {isScrapingJobs ? "Searching..." : "Refresh"}
+                          </Button>
+                        </div>
+
+                        {isScrapingJobs ? (
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {[1, 2, 3, 4].map((i) => (
+                              <div key={i} className="animate-pulse">
+                                <div className="bg-slate-200 dark:bg-slate-700 rounded-xl h-24"></div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : liveJobs.length > 0 ? (
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {liveJobs.map((job, index) => (
+                              <Card
+                                key={index}
+                                className="border-0 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 hover:shadow-lg transition-all duration-200"
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
+                                        {job.title}
+                                      </h4>
+                                      <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                        <span>{job.company}</span>
+                                        <span>•</span>
+                                        <span>{job.location}</span>
+                                      </div>
+                                      {job.salary && (
+                                        <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                                          {job.salary}
+                                        </p>
+                                      )}
+                                      {job.description && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                                          {job.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <Button size="sm" variant="outline" asChild className="ml-4 bg-transparent">
+                                      <a href={job.url} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <Briefcase className="w-8 h-8 text-slate-400" />
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400">
+                              No live jobs found. Try refreshing or check back later.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </TabsContent>
 
                     <TabsContent value="day-in-life" className="space-y-6">
@@ -766,13 +861,12 @@ export default function CareersPage() {
               </Card>
             </div>
           ) : (
-            /* Career List View */
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCareers.map((career, index) => (
                 <Card
                   key={career.id}
                   className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
-                  onClick={() => setSelectedCareer(career)}
+                  onClick={() => handleCareerSelect(career)}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-1">

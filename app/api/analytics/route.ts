@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "`eventType` and `eventName` are required." }, { status: 400 })
     }
 
-    console.log("[Analytics] Received event:", data)
+    // console.log("[Analytics] Received event:", data)
 
     if (data.eventType === "ai_interaction") {
       await convex.mutation(api.analytics.trackAiEvent, {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAnalytics } from "@/lib/analytics"
+import { scrapeJobsClient, scrapeCoursesClient } from "@/lib/scraping-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -82,6 +83,11 @@ export default function DashboardPage() {
     matchingJobs: [],
   })
 
+  const [scrapedJobs, setScrapedJobs] = useState([])
+  const [scrapedCourses, setScrapedCourses] = useState([])
+  const [isScrapingJobs, setIsScrapingJobs] = useState(false)
+  const [isScrapingCourses, setIsScrapingCourses] = useState(false)
+
   useEffect(() => {
     if (getUserByEmail && getCareerRecommendations) {
       generatePersonalizedContent()
@@ -136,6 +142,16 @@ export default function DashboardPage() {
         icon: "🚀",
         priority: "high",
         action: "careers",
+      })
+    }
+
+    if (user?.interests && user.interests.length > 0) {
+      recommendedActions.push({
+        title: "Find Live Job Opportunities",
+        description: "Discover current job openings that match your profile",
+        icon: "💼",
+        priority: "medium",
+        action: "scrape-jobs",
       })
     }
 
@@ -202,6 +218,51 @@ export default function DashboardPage() {
       })
     }
     return jobs
+  }
+
+  const handleScrapeJobs = async () => {
+    if (!getUserByEmail?.interests) return
+
+    setIsScrapingJobs(true)
+    try {
+      const jobs = await scrapeJobsClient({
+        interests: getUserByEmail.interests,
+        skills: getUserByEmail.skills || [],
+        experienceLevel: getUserByEmail.experienceLevel || "mid",
+        location: getUserByEmail.location || "Remote",
+      })
+      setScrapedJobs(jobs.slice(0, 5)) // Show top 5 jobs
+
+      analytics.track("jobs_scraped", {
+        user_id: user?.id,
+        job_count: jobs.length,
+        interests: getUserByEmail.interests,
+      })
+    } catch (error) {
+      console.error("Failed to scrape jobs:", error)
+    } finally {
+      setIsScrapingJobs(false)
+    }
+  }
+
+  const handleScrapeCourses = async () => {
+    if (!getUserByEmail?.interests) return
+
+    setIsScrapingCourses(true)
+    try {
+      const courses = await scrapeCoursesClient(getUserByEmail.interests)
+      setScrapedCourses(courses.slice(0, 3)) // Show top 3 courses
+
+      analytics.track("courses_scraped", {
+        user_id: user?.id,
+        course_count: courses.length,
+        interests: getUserByEmail.interests,
+      })
+    } catch (error) {
+      console.error("Failed to scrape courses:", error)
+    } finally {
+      setIsScrapingCourses(false)
+    }
   }
 
   const [interviewHistory, setInterviewHistory] = useState([
@@ -413,6 +474,12 @@ export default function DashboardPage() {
       priority: action.priority,
       user_id: user?.id,
     })
+
+    if (action.action === "scrape-jobs") {
+      handleScrapeJobs()
+    } else if (action.action === "learning") {
+      handleScrapeCourses()
+    }
   }
 
   if (!isLoaded) {
@@ -690,6 +757,124 @@ export default function DashboardPage() {
                   </Card>
                 )}
               </div>
+
+              {scrapedJobs.length > 0 && (
+                <Card className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 p-1">
+                    <CardHeader>
+                      <CardTitle className="flex items-center text-slate-800 dark:text-slate-100 text-xl">
+                        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                          <Briefcase className="w-4 h-4 text-white" />
+                        </div>
+                        Live Job Opportunities
+                        <Badge className="ml-2 bg-green-500 text-white">Fresh</Badge>
+                      </CardTitle>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                        Real-time job openings matching your profile
+                      </CardDescription>
+                    </CardHeader>
+                  </div>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {scrapedJobs.map((job, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-600 rounded-xl flex items-center justify-center">
+                              <Briefcase className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-slate-800 dark:text-slate-200">{job.title}</h4>
+                              <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
+                                <span>{job.company}</span>
+                                <span>•</span>
+                                <span>{job.location}</span>
+                                {job.salary && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{job.salary}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Button size="sm" variant="outline" asChild>
+                              <a href={job.url} target="_blank" rel="noopener noreferrer">
+                                Apply
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 text-center">
+                      <Button
+                        variant="outline"
+                        onClick={handleScrapeJobs}
+                        disabled={isScrapingJobs}
+                        className="bg-transparent"
+                      >
+                        {isScrapingJobs ? "Searching..." : "Refresh Jobs"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {scrapedCourses.length > 0 && (
+                <Card className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-1">
+                    <CardHeader>
+                      <CardTitle className="flex items-center text-slate-800 dark:text-slate-100 text-xl">
+                        <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+                          <BookOpen className="w-4 h-4 text-white" />
+                        </div>
+                        Trending Courses
+                        <Badge className="ml-2 bg-purple-500 text-white">Live</Badge>
+                      </CardTitle>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                        Latest courses for your interests
+                      </CardDescription>
+                    </CardHeader>
+                  </div>
+                  <CardContent className="p-6">
+                    <div className="grid md:grid-cols-3 gap-4">
+                      {scrapedCourses.map((course, index) => (
+                        <div
+                          key={index}
+                          className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl"
+                        >
+                          <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">{course.title}</h4>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{course.provider}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                              {course.price || "Free"}
+                            </span>
+                            <Button size="sm" variant="outline" asChild>
+                              <a href={course.url} target="_blank" rel="noopener noreferrer">
+                                View
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 text-center">
+                      <Button
+                        variant="outline"
+                        onClick={handleScrapeCourses}
+                        disabled={isScrapingCourses}
+                        className="bg-transparent"
+                      >
+                        {isScrapingCourses ? "Finding Courses..." : "Refresh Courses"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Learning Paths */}
               {personalizedContent.learningPath.length > 0 && (

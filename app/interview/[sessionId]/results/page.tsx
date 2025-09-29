@@ -1,590 +1,903 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { Id } from "@/convex/_generated/dataModel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Brain, ArrowLeft, Star, TrendingUp, TrendingDown, Clock, Target, Award, MessageSquare, Download, Share2, BookOpen, CheckCircle, XCircle, AlertCircle, Trophy, Zap, BarChart3 } from "lucide-react"
+import {
+  Brain,
+  Clock,
+  MessageSquare,
+  ArrowRight,
+  CheckCircle,
+  Star,
+  Pause,
+  Play,
+  SkipForward,
+  Lightbulb,
+  Target,
+  BarChart3,
+  AlertCircle,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Bookmark,
+  RotateCcw,
+  Zap,
+} from "lucide-react"
+import { useAnalytics } from "@/lib/analytics"
+import { type AIProvider, getAIService, getUserPreferredProvider, getProviderConfig } from "@/lib/ai-provider"
+import { evaluateAnswer } from "@/lib/ai-interview"
 
-interface InterviewResults {
-  jobRole: string
-  interviewType: string
-  sessionType: string
-  difficulty: string
-  startTime: number
-  questions: Array<{
-    id: number
-    question: string
-    answer: string
-    feedback: string
-    score: number
-  }>
-  overallScore: number
-  strengths: string[]
-  improvementAreas: string[]
-  recommendations: string[]
-  duration: number
+interface Question {
+  id: number
+  question: string
+  answer?: string
+  feedback?: string
+  score?: number
+  isAnswered: boolean
+  difficulty?: string
+  category?: string
+  timeSpent?: number
 }
 
-export default function EnhancedInterviewResultsPage() {
-  const [results, setResults] = useState<InterviewResults | null>(null)
+interface InterviewSession {
+  jobRole: string
+  interviewType: string
+  sessionType: "text" | "voice"
+  difficulty: string
+  aiProvider?: AIProvider
+  startTime: number
+  questions: Question[]
+  currentQuestionIndex: number
+  isCompleted: boolean
+  isPaused?: boolean
+}
+
+export default function EnhancedOriginalInterviewSessionPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { user } = useUser()
+  const sessionId = params.sessionId as Id<"interviewSessions">
+  
+  // Backend queries and mutations
+  const sessionData = useQuery(api.interviews.getSession, { sessionId })
+  const submitAnswer = useMutation(api.interviews.submitAnswer)
+  const completeSession = useMutation(api.interviews.completeSession)
+  
+  // Local state
+  const [session, setSession] = useState<InterviewSession | null>(null)
+  const [sessionConfig, setSessionConfig] = useState<any>(null)
+
+  const [currentAnswer, setCurrentAnswer] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [animationComplete, setAnimationComplete] = useState(false)
-  const [selectedQuestion, setSelectedQuestion] = useState<number | null>(null)
+  const [timeElapsed, setTimeElapsed] = useState(0)
+  const [questionStartTime, setQuestionStartTime] = useState(Date.now())
+  const [showHints, setShowHints] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [wordCount, setWordCount] = useState(0)
+  const [savedDraft, setSavedDraft] = useState("")
+  const analytics = useAnalytics()
+
+  // Load session data from backend
+  useEffect(() => {
+    // Handle loading state
+    if (sessionData === undefined) {
+      // Still loading, do nothing
+      return
+    }
+    
+    // Handle missing or unauthorized session
+    if (sessionData === null) {
+      console.error('Session not found or unauthorized')
+      setIsLoading(false)
+      // Could redirect to interview page or show error
+      router.push('/interview')
+      return
+    }
+    
+    // Load additional config from localStorage
+    const configKey = `interview_config_${sessionId}`
+    const savedConfig = localStorage.getItem(configKey)
+    const config = savedConfig ? JSON.parse(savedConfig) : {
+      interviewType: 'general',
+      difficulty: 'intermediate',
+      aiProvider: getUserPreferredProvider(),
+      startTime: sessionData.createdAt,
+    }
+    
+    setSessionConfig(config)
+    
+    // Convert backend data to frontend format
+    const questions: Question[] = sessionData.questions.map((q: any, index: number) => ({
+      id: index + 1,
+      question: q.question,
+      answer: q.answer,
+      feedback: q.feedback,
+      score: q.score,
+      isAnswered: !!q.answer,
+      difficulty: config.difficulty === 'beginner' ? 'Easy' : config.difficulty === 'advanced' ? 'Hard' : 'Medium',
+      category: config.interviewType === 'behavioral' ? 'Behavioral' : 
+                config.interviewType === 'technical' ? 'Technical' : 
+                config.interviewType === 'system-design' ? 'System Design' : 'General',
+      timeSpent: q.timeSpent,
+    }))
+    
+    // Find current question index
+    const currentIndex = questions.findIndex(q => !q.isAnswered)
+    
+    setSession({
+      jobRole: sessionData.jobRole,
+      interviewType: config.interviewType,
+      sessionType: sessionData.sessionType,
+      difficulty: config.difficulty,
+      aiProvider: config.aiProvider,
+      startTime: config.startTime,
+      questions,
+      currentQuestionIndex: currentIndex === -1 ? questions.length - 1 : currentIndex,
+      isCompleted: sessionData.status === 'completed',
+      isPaused: false,
+    })
+    
+    setIsLoading(false)
+  }, [sessionData, sessionId])
+
+  // Calculate word count
+  useEffect(() => {
+    const words = currentAnswer
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length
+    setWordCount(currentAnswer.trim() === "" ? 0 : words)
+  }, [currentAnswer])
+
+  // Timer effect
+  useEffect(() => {
+    if (!session || session.isPaused || session.isCompleted || isLoading) return
+
+    const timer = setInterval(() => {
+      setTimeElapsed((prev) => prev + 1)
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [session?.isPaused, session?.isCompleted, isLoading, session])
 
   useEffect(() => {
-    // Simulate loading and generate mock data
-    setTimeout(() => {
-      const mockResults: InterviewResults = {
-        jobRole: "Senior Software Engineer",
-        interviewType: "Technical Interview",
-        sessionType: "Mock Interview",
-        difficulty: "Advanced",
-        startTime: Date.now() - 1800000, // 30 minutes ago
-        questions: [
-          {
-            id: 1,
-            question: "Explain the difference between REST and GraphQL APIs, and when would you choose one over the other?",
-            answer: "REST is a stateless architecture that uses standard HTTP methods, while GraphQL provides a single endpoint with flexible queries. I'd choose REST for simple CRUD operations and GraphQL for complex data relationships.",
-            feedback: "Good technical understanding. Could benefit from more specific examples of implementation scenarios.",
-            score: 7.5
-          },
-          {
-            id: 2,
-            question: "How would you optimize a slow database query?",
-            answer: "I'd start by analyzing the execution plan, check for proper indexing, optimize joins, and consider query restructuring. Also look at database statistics and consider caching strategies.",
-            feedback: "Excellent systematic approach! Great mention of execution plans and multiple optimization strategies.",
-            score: 9.0
-          },
-          {
-            id: 3,
-            question: "Describe your experience with microservices architecture.",
-            answer: "I've worked with containerized services using Docker and Kubernetes, implemented service discovery, and handled inter-service communication through message queues.",
-            feedback: "Solid practical experience mentioned. Could elaborate more on challenges faced and lessons learned.",
-            score: 8.0
-          },
-          {
-            id: 4,
-            question: "How do you handle error handling in distributed systems?",
-            answer: "I implement circuit breakers, retry mechanisms with exponential backoff, proper logging, and monitoring. Also use bulkhead patterns for isolation.",
-            feedback: "Outstanding knowledge of resilience patterns! Very comprehensive answer covering multiple aspects.",
-            score: 9.5
-          }
-        ],
-        overallScore: 8.5,
-        strengths: ["Strong technical knowledge", "Systematic problem-solving approach", "Good understanding of distributed systems", "Practical experience with modern tools"],
-        improvementAreas: ["Provide more specific examples", "Elaborate on challenges and lessons learned", "Discuss trade-offs in more detail"],
-        recommendations: ["Practice behavioral questions with STAR method", "Prepare more detailed project examples", "Study system design patterns", "Practice explaining complex concepts simply"],
-        duration: 1800
+    if (session) {
+      analytics.trackInterviewStarted(session.interviewType, session.difficulty)
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (session) {
+      setQuestionStartTime(Date.now())
+    }
+  }, [session?.currentQuestionIndex])
+
+  const handleSubmitAnswer = async () => {
+    if (!currentAnswer.trim() || !session) return
+
+    setIsSubmitting(true)
+    const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000)
+    const currentQuestion = session.questions[session.currentQuestionIndex]
+
+    analytics.trackQuestionAnswered(
+      session.currentQuestionIndex,
+      currentQuestion.category || "general",
+      timeSpent,
+    )
+
+    try {
+      // Use the mock AI evaluation for now
+      const evaluation = await evaluateAnswer(
+        currentQuestion.question,
+        currentAnswer,
+        session.jobRole,
+      )
+
+      // Submit to backend
+      await submitAnswer({
+        sessionId,
+        questionIndex: session.currentQuestionIndex,
+        answer: currentAnswer,
+        feedback: evaluation.feedback,
+        score: evaluation.score,
+      })
+
+      analytics.trackQuestionAnswered(
+        session.currentQuestionIndex,
+        currentQuestion.category || "general",
+        timeSpent,
+        evaluation.score,
+      )
+
+      // Update local state
+      const updatedQuestions = [...session.questions]
+      updatedQuestions[session.currentQuestionIndex] = {
+        ...currentQuestion,
+        answer: currentAnswer,
+        feedback: evaluation.feedback,
+        score: evaluation.score,
+        isAnswered: true,
+        timeSpent,
       }
 
-      setResults(mockResults)
-      setIsLoading(false)
-      
-      // Trigger animations after a short delay
-      setTimeout(() => setAnimationComplete(true), 500)
-    }, 1500)
-  }, [])
+      const updatedSession = {
+        ...session,
+        questions: updatedQuestions,
+      }
 
-  const formatDuration = (seconds: number) => {
+      setSession(updatedSession)
+      setCurrentAnswer("")
+      setSavedDraft("")
+      setIsSubmitting(false)
+      setShowHints(false)
+
+      // Auto-advance after showing feedback
+      setTimeout(async () => {
+        if (session.currentQuestionIndex < session.questions.length - 1) {
+          setSession((prev) => ({
+            ...prev!,
+            currentQuestionIndex: prev!.currentQuestionIndex + 1,
+          }))
+          setQuestionStartTime(Date.now())
+        } else {
+          // Interview completed - submit to backend
+          const averageScore =
+            updatedQuestions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+            updatedQuestions.length
+
+          await completeSession({
+            sessionId,
+            overallScore: averageScore,
+            overallFeedback: 'Interview completed successfully',
+            duration: Math.floor((Date.now() - session.startTime) / 1000),
+          })
+
+          analytics.trackInterviewCompleted(updatedQuestions.length, averageScore, timeElapsed)
+
+          // Navigate to results page
+          router.push(`/interview/${sessionId}/results`)
+        }
+      }, 4000)
+    } catch (error) {
+      console.error('Error submitting answer:', error)
+      
+      // Fallback to mock evaluation
+      const mockScore = Math.floor(Math.random() * 3) + 7
+      const mockFeedback = generateMockFeedback(currentAnswer, currentQuestion.category)
+
+      try {
+        await submitAnswer({
+          sessionId,
+          questionIndex: session.currentQuestionIndex,
+          answer: currentAnswer,
+          feedback: mockFeedback,
+          score: mockScore,
+        })
+      } catch (backendError) {
+        console.error('Backend submission failed:', backendError)
+      }
+
+      // Update local state with fallback
+      const updatedQuestions = [...session.questions]
+      updatedQuestions[session.currentQuestionIndex] = {
+        ...currentQuestion,
+        answer: currentAnswer,
+        feedback: mockFeedback,
+        score: mockScore,
+        isAnswered: true,
+        timeSpent,
+      }
+
+      setSession({ ...session, questions: updatedQuestions })
+      setCurrentAnswer("")
+      setIsSubmitting(false)
+      setShowHints(false)
+    }
+  }
+
+  const generateMockFeedback = (answer: string, category?: string) => {
+    const feedbackOptions = {
+      Behavioral: [
+        "Good use of specific examples. Consider structuring your response using the STAR method for even stronger impact.",
+        "Your answer shows good self-awareness. Adding more quantifiable results would strengthen your response.",
+        "Nice personal touch in your answer. Consider expanding on the skills you demonstrated in this situation.",
+      ],
+      Technical: [
+        "Solid technical knowledge demonstrated. Consider discussing trade-offs between different approaches.",
+        "Good explanation of concepts. Adding real-world examples of implementation would enhance your answer.",
+        "Shows understanding of the fundamentals. Discussing recent trends or updates would show continued learning.",
+      ],
+      "Career Goals": [
+        "Clear vision for your future. Consider connecting your goals more directly to this specific role.",
+        "Good forward-thinking approach. Adding specific steps you're taking to achieve these goals would strengthen your answer.",
+        "Realistic and thoughtful goals. Consider mentioning how this role fits into your broader career strategy.",
+      ],
+    }
+
+    const categoryFeedback = feedbackOptions[category as keyof typeof feedbackOptions] || feedbackOptions.Behavioral
+    return categoryFeedback[Math.floor(Math.random() * categoryFeedback.length)]
+  }
+
+  const handlePauseResume = () => {
+    setSession((prev) => ({ ...prev, isPaused: !prev.isPaused }))
+  }
+
+  const handleSkipQuestion = () => {
+    if (session.currentQuestionIndex < session.questions.length - 1) {
+      setSession((prev) => ({
+        ...prev,
+        currentQuestionIndex: prev.currentQuestionIndex + 1,
+      }))
+      setCurrentAnswer("")
+      setQuestionStartTime(Date.now())
+    }
+  }
+
+  const handleSaveDraft = () => {
+    setSavedDraft(currentAnswer)
+    // Could also save to localStorage here
+  }
+
+  const handleLoadDraft = () => {
+    setCurrentAnswer(savedDraft)
+  }
+
+  const handleToggleRecording = () => {
+    setIsRecording(!isRecording)
+    // In a real implementation, this would start/stop audio recording
+  }
+
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
-    return `${mins}m ${secs}s`
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 9) return "text-emerald-500"
-    if (score >= 8) return "text-green-500"
-    if (score >= 7) return "text-yellow-500"
-    if (score >= 6) return "text-orange-500"
-    return "text-red-500"
+    if (score >= 9) return "text-green-600"
+    if (score >= 7) return "text-blue-600"
+    if (score >= 5) return "text-yellow-600"
+    return "text-red-600"
   }
 
-  const getScoreIcon = (score: number) => {
-    if (score >= 9) return <CheckCircle className="w-5 h-5 text-emerald-500" />
-    if (score >= 7) return <AlertCircle className="w-5 h-5 text-yellow-500" />
-    return <XCircle className="w-5 h-5 text-red-500" />
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty?.toLowerCase()) {
+      case "easy":
+        return "bg-green-100 text-green-700 border-green-200"
+      case "medium":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200"
+      case "hard":
+        return "bg-red-100 text-red-700 border-red-200"
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200"
+    }
   }
 
-  const getOverallGrade = (score: number) => {
-    if (score >= 9.5) return { grade: "A+", color: "text-emerald-500", bg: "bg-emerald-500/10" }
-    if (score >= 9) return { grade: "A", color: "text-emerald-500", bg: "bg-emerald-500/10" }
-    if (score >= 8.5) return { grade: "A-", color: "text-green-500", bg: "bg-green-500/10" }
-    if (score >= 8) return { grade: "B+", color: "text-green-500", bg: "bg-green-500/10" }
-    if (score >= 7) return { grade: "B", color: "text-yellow-500", bg: "bg-yellow-500/10" }
-    if (score >= 6) return { grade: "B-", color: "text-yellow-500", bg: "bg-yellow-500/10" }
-    if (score >= 5) return { grade: "C", color: "text-orange-500", bg: "bg-orange-500/10" }
-    return { grade: "D", color: "text-red-500", bg: "bg-red-500/10" }
-  }
-
-  const getPerformanceLevel = (score: number) => {
-    if (score >= 9) return { level: "Exceptional", icon: <Trophy className="w-5 h-5" />, color: "text-emerald-500" }
-    if (score >= 8) return { level: "Strong", icon: <Zap className="w-5 h-5" />, color: "text-green-500" }
-    if (score >= 7) return { level: "Good", icon: <Target className="w-5 h-5" />, color: "text-yellow-500" }
-    if (score >= 6) return { level: "Fair", icon: <BarChart3 className="w-5 h-5" />, color: "text-orange-500" }
-    return { level: "Needs Work", icon: <AlertCircle className="w-5 h-5" />, color: "text-red-500" }
-  }
-
+  // Handle loading and error states
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <div className="space-y-2">
-            <div className="text-lg font-semibold text-slate-700 dark:text-slate-300">Analyzing your performance...</div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">This may take a moment</div>
-          </div>
+          <h3 className="text-xl font-semibold text-slate-900">Loading Your Interview</h3>
+          <p className="text-slate-600">Please wait while we prepare your session...</p>
         </div>
       </div>
     )
   }
-
-  if (!results) {
+  
+  if (!session) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
-          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Results not found</h3>
-          <p className="text-slate-500 dark:text-slate-400">The interview session could not be loaded.</p>
-          <Button className="mt-4">Start New Interview</Button>
+          <h3 className="text-xl font-semibold text-slate-900">Session Not Found</h3>
+          <p className="text-slate-600">The interview session could not be loaded.</p>
+          <button 
+            onClick={() => router.push('/interview')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Start New Interview
+          </button>
         </div>
       </div>
     )
   }
 
-  const overallGrade = getOverallGrade(results.overallScore)
-  const performanceLevel = getPerformanceLevel(results.overallScore)
+  const currentQuestion = session.questions[session.currentQuestionIndex]
+  const progress =
+    ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
+  const completedQuestions = session.questions.filter((q) => q.isAnswered).length
+  const providerConfig = getProviderConfig(session.aiProvider || "openai")
+
+
+  if (session.isCompleted) {
+    const averageScore =
+      completedQuestions > 0
+        ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions
+        : 0
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto px-4">
+          <Card className="bg-white shadow-2xl border-slate-200/50">
+            <CardContent className="pt-12 pb-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-8">
+                <CheckCircle className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-4xl font-bold text-slate-900 mb-4">Interview Completed!</h2>
+              <p className="text-xl text-slate-600 mb-8 max-w-lg mx-auto">
+                Congratulations! You've successfully completed your {session.jobRole} interview session.
+              </p>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-3 gap-6 mb-8 max-w-md mx-auto">
+                <div className="text-center p-4 bg-slate-50 rounded-xl">
+                  <div className="text-2xl font-bold text-slate-900 mb-1">{completedQuestions}</div>
+                  <p className="text-sm text-slate-600">Questions</p>
+                </div>
+                <div className="text-center p-4 bg-slate-50 rounded-xl">
+                  <div className="text-2xl font-bold text-slate-900 mb-1">{formatTime(timeElapsed)}</div>
+                  <p className="text-sm text-slate-600">Duration</p>
+                </div>
+                <div className="text-center p-4 bg-slate-50 rounded-xl">
+                  <div className={`text-2xl font-bold mb-1 ${getScoreColor(averageScore)}`}>
+                    {averageScore.toFixed(1)}
+                  </div>
+                  <p className="text-sm text-slate-600">Avg Score</p>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <Badge variant="outline" className="px-3 py-1">
+                  Powered by {providerConfig.name} {providerConfig.icon}
+                </Badge>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
+                  onClick={() => router.push(`/interview/${sessionId}/results`)}
+                >
+                  View Detailed Results
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <Button size="lg" variant="outline" className="px-8 bg-transparent">
+                  Practice Again
+                  <RotateCcw className="ml-2 w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Enhanced Navigation */}
-      <nav className="border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Button variant="ghost" className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Dashboard</span>
-            </Button>
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Enhanced Header */}
+      <div className="bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-200/50 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Brain className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Career Companion
-              </span>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">{session.jobRole} Interview</h1>
+                <p className="text-sm text-slate-600 capitalize flex items-center space-x-2">
+                  <span>{session.interviewType}</span>
+                  <span>•</span>
+                  <span>{session.difficulty}</span>
+                  <span>•</span>
+                  <span className="flex items-center space-x-1">
+                    <span>{providerConfig.name}</span>
+                    <span>{providerConfig.icon}</span>
+                  </span>
+                  {session.isPaused && (
+                    <>
+                      <span>•</span>
+                      <Badge variant="secondary" className="text-xs">
+                        Paused
+                      </Badge>
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" className="hidden sm:flex items-center space-x-2">
-                <Share2 className="w-4 h-4" />
-                <span>Share</span>
-              </Button>
-              <Button variant="outline" size="sm" className="hidden sm:flex items-center space-x-2">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </Button>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={handlePauseResume}>
+                  {session.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="text-slate-600"
+                >
+                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </Button>
+              </div>
+              <div className="flex items-center space-x-3 text-slate-600">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-mono tabular-nums">{formatTime(timeElapsed)}</span>
+              </div>
+              <Badge variant="outline" className="px-3 py-1">
+                {session.currentQuestionIndex + 1} of {session.questions.length}
+              </Badge>
             </div>
           </div>
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600">Interview Progress</span>
+              <span className="text-sm text-slate-600">{Math.round(progress)}% complete</span>
+            </div>
+            <Progress value={progress} className="h-3 bg-slate-200" />
+          </div>
         </div>
-      </nav>
+      </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Animated Header */}
-        <div className={`text-center mb-12 transition-all duration-1000 ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center animate-pulse">
-                <Award className="w-10 h-10 text-white" />
-              </div>
-              <div className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4">
-            Interview Complete! 🎉
-          </h1>
-          <div className="flex items-center justify-center space-x-4 text-slate-600 dark:text-slate-400">
-            <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
-              {results.jobRole}
-            </span>
-            <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
-              {results.interviewType}
-            </span>
-            <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-medium">
-              {formatDuration(results.duration)}
-            </span>
-          </div>
-        </div>
-
-        {/* Enhanced Overall Score Card */}
-        <Card className={`border-0 shadow-2xl mb-8 overflow-hidden transition-all duration-1000 ${animationComplete ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-          <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 p-1">
-            <div className="bg-white dark:bg-slate-900 rounded-lg">
-              <CardContent className="pt-8 pb-8">
-                <div className="text-center">
-                  <div className="flex items-center justify-center space-x-8 mb-8">
-                    <div className="text-center">
-                      <div className={`text-7xl font-bold ${overallGrade.color} mb-2 transition-all duration-1000 ${animationComplete ? 'scale-100' : 'scale-0'}`}>
-                        {overallGrade.grade}
-                      </div>
-                      <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full ${overallGrade.bg} mb-2`}>
-                        {performanceLevel.icon}
-                        <span className={`font-semibold ${performanceLevel.color}`}>
-                          {performanceLevel.level}
-                        </span>
-                      </div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Performance Level</p>
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Current Question Card */}
+            <Card className="bg-white shadow-xl border-slate-200/50">
+              <CardHeader className="border-b border-slate-100">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Badge className={`px-3 py-1 ${getDifficultyColor(currentQuestion.difficulty || "")}`}>
+                        {currentQuestion.difficulty}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        {currentQuestion.category}
+                      </Badge>
                     </div>
-                    <div className="text-center">
-                      <div className="text-7xl font-bold text-slate-900 dark:text-white mb-2 transition-all duration-1000 delay-300">
-                        {results.overallScore}
-                      </div>
-                      <div className="text-slate-500 dark:text-slate-400 font-medium">out of 10</div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Average Score</p>
-                    </div>
+                    <CardTitle className="text-2xl text-slate-900">
+                      Question {session.currentQuestionIndex + 1}
+                    </CardTitle>
                   </div>
-                  <div className="max-w-md mx-auto">
-                    <Progress 
-                      value={results.overallScore * 10} 
-                      className="h-4 bg-slate-200 dark:bg-slate-700"
-                    />
-                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      <span>0</span>
-                      <span>5</span>
-                      <span>10</span>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowHints(!showHints)}
+                      className="text-yellow-600 hover:text-yellow-700"
+                    >
+                      <Lightbulb className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleSkipQuestion} className="text-slate-600">
+                      <SkipForward className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </div>
-          </div>
-        </Card>
-
-        {/* Enhanced Stats Grid */}
-        <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 transition-all duration-1000 delay-500 ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 hover:shadow-xl transition-shadow">
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <MessageSquare className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{results.questions.length}</div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Questions Answered</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 hover:shadow-xl transition-shadow">
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Clock className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{formatDuration(results.duration)}</div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Total Duration</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 hover:shadow-xl transition-shadow">
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{results.strengths.length}</div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Key Strengths</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 hover:shadow-xl transition-shadow">
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{results.improvementAreas.length}</div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Growth Areas</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Enhanced Tabs */}
-        <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4 bg-white dark:bg-slate-800 shadow-lg rounded-lg p-1">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="questions" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Questions
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Analysis
-            </TabsTrigger>
-            <TabsTrigger value="recommendations" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Next Steps
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-slate-900 dark:text-white">
-                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mr-3">
-                      <TrendingUp className="w-4 h-4 text-white" />
-                    </div>
-                    Your Strengths
-                  </CardTitle>
-                  <CardDescription>Areas where you excelled</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {results.strengths.map((strength, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-                        <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-slate-700 dark:text-slate-300 leading-relaxed">{strength}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/10 dark:to-orange-900/10">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-slate-900 dark:text-white">
-                    <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center mr-3">
-                      <Target className="w-4 h-4 text-white" />
-                    </div>
-                    Growth Opportunities
-                  </CardTitle>
-                  <CardDescription>Areas to focus on improving</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {results.improvementAreas.map((area, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-                        <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-slate-700 dark:text-slate-300 leading-relaxed">{area}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="questions" className="space-y-6">
-            <div className="grid gap-6">
-              {results.questions.map((question, index) => (
-                <Card 
-                  key={question.id} 
-                  className={`border-0 shadow-lg cursor-pointer transition-all duration-300 hover:shadow-xl ${
-                    selectedQuestion === index ? 'ring-2 ring-blue-500' : ''
-                  }`}
-                  onClick={() => setSelectedQuestion(selectedQuestion === index ? null : index)}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">{index + 1}</span>
-                        </div>
-                        <CardTitle className="text-slate-900 dark:text-white">
-                          Question {index + 1}
-                        </CardTitle>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        {getScoreIcon(question.score)}
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${getScoreColor(question.score)}`}>
-                            {question.score}/10
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">Score</div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className={`space-y-4 transition-all duration-300 ${
-                    selectedQuestion === index ? 'max-h-none opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-                  }`}>
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                      <h4 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Question
-                      </h4>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{question.question}</p>
-                    </div>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                      <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Your Answer</h4>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{question.answer}</p>
-                    </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                      <h4 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center">
-                        <Brain className="w-4 h-4 mr-2" />
-                        AI Feedback
-                      </h4>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{question.feedback}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="feedback" className="space-y-6">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center text-slate-900 dark:text-white">
-                  <BarChart3 className="w-5 h-5 mr-2" />
-                  Performance Analysis
-                </CardTitle>
-                <CardDescription>Detailed breakdown of your interview performance</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-slate-900 dark:text-white mb-4">Score Distribution</h4>
-                    <div className="space-y-4">
-                      {results.questions.map((question, index) => (
-                        <div key={index} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-slate-900 dark:text-white">
-                              Question {index + 1}
-                            </span>
-                            <span className={`font-bold ${getScoreColor(question.score)}`}>
-                              {question.score}/10
-                            </span>
-                          </div>
-                          <Progress value={question.score * 10} className="h-3" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <CardContent className="pt-6">
+                <div className="mb-6">
+                  <p className="text-xl text-slate-800 leading-relaxed">{currentQuestion.question}</p>
                 </div>
+
+                {showHints && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Lightbulb className="w-4 h-4 text-yellow-600" />
+                      <span className="font-medium text-yellow-800">Interview Tips</span>
+                    </div>
+                    <ul className="space-y-2 text-sm text-yellow-700">
+                      <li className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <span>Use the STAR method for behavioral questions (Situation, Task, Action, Result)</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <span>Provide specific examples from your experience</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <span>Quantify your achievements when possible</span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="recommendations" className="space-y-6">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center text-slate-900 dark:text-white">
-                  <BookOpen className="w-5 h-5 mr-2" />
-                  Personalized Action Plan
-                </CardTitle>
-                <CardDescription>Tailored recommendations to accelerate your interview success</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {results.recommendations.map((recommendation, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start space-x-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
+            {/* Answer Input or Feedback */}
+            {!currentQuestion.isAnswered ? (
+              <Card className="bg-white shadow-xl border-slate-200/50">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center text-slate-900">
+                        {session.sessionType === "voice" ? (
+                          <>
+                            <Mic className="w-5 h-5 mr-2" />
+                            Voice Response
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-5 h-5 mr-2" />
+                            Written Response
+                          </>
+                        )}
+                      </CardTitle>
+                      <CardDescription>Take your time and provide a thoughtful, detailed answer</CardDescription>
+                    </div>
+                    {session.sessionType === "voice" && (
+                      <Button
+                        variant={isRecording ? "destructive" : "default"}
+                        size="sm"
+                        onClick={handleToggleRecording}
+                        className="flex items-center space-x-2"
+                      >
+                        {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        <span>{isRecording ? "Stop Recording" : "Start Recording"}</span>
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {session.sessionType === "voice" ? (
+                    <div className="text-center py-16">
+                      <div
+                        className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
+                          isRecording
+                            ? "bg-red-100 border-4 border-red-300 animate-pulse shadow-lg"
+                            : "bg-slate-100 border-4 border-slate-300 hover:bg-slate-200"
+                        }`}
+                      >
+                        <Mic className={`w-8 h-8 ${isRecording ? "text-red-600" : "text-slate-600"}`} />
+                      </div>
+                      <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                        {isRecording ? "Recording your response..." : "Ready to record"}
+                      </h3>
+                      <p className="text-slate-600 mb-6">
+                        {isRecording
+                          ? "Speak clearly and at a natural pace. Click stop when finished."
+                          : "Click the record button above to start speaking your answer"}
+                      </p>
+                      {isRecording && (
+                        <div className="flex items-center justify-center space-x-2 text-red-600">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                          <span className="text-sm font-mono">
+                            {formatTime(Math.floor((Date.now() - questionStartTime) / 1000))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Textarea
+                          value={currentAnswer}
+                          onChange={(e) => setCurrentAnswer(e.target.value)}
+                          placeholder="Start typing your response here... Be specific and provide examples where possible."
+                          className="min-h-40 text-base leading-relaxed border-slate-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                          disabled={isSubmitting || session.isPaused}
+                        />
+                        {session.isPaused && (
+                          <div className="absolute inset-0 bg-slate-100/80 rounded-lg flex items-center justify-center">
+                            <div className="text-center">
+                              <Pause className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                              <p className="text-sm text-slate-600">Interview Paused</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center space-x-4 text-slate-500">
+                          <span>{currentAnswer.length} characters</span>
+                          <span>{wordCount} words</span>
+                          <span className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            {formatTime(Math.floor((Date.now() - questionStartTime) / 1000))}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {wordCount < 30 && currentAnswer.length > 0 && (
+                            <div className="flex items-center space-x-1 text-amber-600">
+                              <AlertCircle className="w-3 h-3" />
+                              <span className="text-xs">Consider adding more detail</span>
+                            </div>
+                          )}
+                          {savedDraft && (
+                            <Button size="sm" variant="outline" onClick={handleLoadDraft}>
+                              Load Draft
+                            </Button>
+                          )}
+                          {currentAnswer && (
+                            <Button size="sm" variant="ghost" onClick={handleSaveDraft}>
+                              <Bookmark className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={handleSubmitAnswer}
+                      disabled={(!currentAnswer.trim() && !isRecording) || isSubmitting || session.isPaused}
+                      size="lg"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
                     >
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold text-white">{index + 1}</span>
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Analyzing Response...
+                        </>
+                      ) : (
+                        <>
+                          Submit Answer
+                          <ArrowRight className="ml-2 w-4 h-4" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              /* Enhanced Feedback Display */
+              <Card className="bg-white shadow-xl border-slate-200/50">
+                <CardHeader className="border-b border-slate-100">
+                  <CardTitle className="flex items-center text-slate-900">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                      <Zap className="w-5 h-5 text-blue-600" />
+                    </div>
+                    AI Feedback & Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+                      <div className="flex items-center justify-center space-x-2 mb-3">
+                        <Star className="w-6 h-6 text-yellow-500" />
+                        <span className={`text-4xl font-bold ${getScoreColor(currentQuestion.score || 0)}`}>
+                          {currentQuestion.score}
+                        </span>
+                        <span className="text-2xl text-slate-500">/10</span>
                       </div>
-                      <div className="flex-1">
-                        <span className="text-slate-700 dark:text-slate-300 leading-relaxed">{recommendation}</span>
+                      <p className="text-sm text-slate-600 font-medium">Response Score</p>
+                    </div>
+                    <div className="text-center p-6 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-center space-x-2 mb-3">
+                        <Clock className="w-5 h-5 text-slate-500" />
+                        <span className="text-4xl font-bold text-slate-900">
+                          {formatTime(currentQuestion.timeSpent || 0)}
+                        </span>
                       </div>
+                      <p className="text-sm text-slate-600 font-medium">Response Time</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-6">
+                    <div className="flex items-start space-x-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Star className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900 mb-2">Detailed Feedback</h4>
+                        <p className="text-slate-700 leading-relaxed">{currentQuestion.feedback}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {session.currentQuestionIndex < session.questions.length - 1 && (
+                    <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-center space-x-2 text-blue-700">
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm font-medium">Preparing next question...</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Enhanced Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Progress Overview */}
+            <Card className="bg-white shadow-xl border-slate-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center text-slate-900 text-base">
+                  <Target className="w-4 h-4 mr-2" />
+                  Progress Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {session.questions.map((q, index) => (
+                    <div
+                      key={q.id}
+                      className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${
+                        index === session.currentQuestionIndex
+                          ? "bg-blue-50 border-blue-300"
+                          : q.isAnswered
+                            ? "bg-green-50 border-green-200"
+                            : "bg-slate-50 border-slate-200"
+                      }`}
+                      onClick={() => {
+                        if (q.isAnswered || index === session.currentQuestionIndex) {
+                          setSession((prev) => ({ ...prev, currentQuestionIndex: index }))
+                          setCurrentAnswer("")
+                          setQuestionStartTime(Date.now())
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm text-slate-900">Q{index + 1}</span>
+                        {q.isAnswered ? (
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <span className="text-xs text-slate-500">{q.difficulty}</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-700 mt-1 line-clamp-2">{q.question}</p>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-6">
-              <Button size="lg" variant="outline" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Practice Again
-              </Button>
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                <TrendingUp className="w-4 h-4 mr-2" />
-                View Dashboard
-              </Button>
-              <Button size="lg" variant="outline" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <BookOpen className="w-4 h-4 mr-2" />
-                Study Resources
-              </Button>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Achievement Badge Section */}
-        <div className={`mt-12 transition-all duration-1000 delay-700 ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/10 dark:via-orange-900/10 dark:to-red-900/10">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="flex justify-center mb-4">
-                  <div className="flex items-center space-x-2">
-                    {results.overallScore >= 9 ? (
-                      <>
-                        <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center">
-                          <Trophy className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
-                          🏆 Interview Master Achievement Unlocked!
-                        </span>
-                      </>
-                    ) : results.overallScore >= 8 ? (
-                      <>
-                        <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center">
-                          <Star className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                          ⭐ Strong Performer Badge Earned!
-                        </span>
-                      </>
-                    ) : results.overallScore >= 7 ? (
-                      <>
-                        <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                          <Target className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                          🎯 Good Progress Badge Earned!
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
-                          <Zap className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                          ⚡ Learning Journey Badge Earned!
-                        </span>
-                      </>
-                    )}
-                  </div>
+            {/* Session Stats */}
+            <Card className="bg-white shadow-xl border-slate-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center text-slate-900 text-base">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Session Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Total Questions</span>
+                  <span className="font-medium text-slate-900">{session.questions.length}</span>
                 </div>
-                <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-                  {results.overallScore >= 9 
-                    ? "Outstanding performance! You've demonstrated exceptional interview skills and deep technical knowledge."
-                    : results.overallScore >= 8
-                    ? "Great job! You showed strong technical competency and clear communication skills."
-                    : results.overallScore >= 7
-                    ? "Good work! You're on the right track with solid fundamentals and room to grow."
-                    : "Every interview is a learning opportunity. Keep practicing and you'll see continuous improvement!"
-                  }
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions Floating Panel */}
-        <div className="fixed bottom-6 right-6 z-40">
-          <div className="flex flex-col space-y-2">
-            <Button 
-              size="sm" 
-              className="rounded-full w-12 h-12 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all"
-              title="Share Results"
-            >
-              <Share2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              className="rounded-full w-12 h-12 bg-white dark:bg-slate-800 shadow-lg hover:shadow-xl transition-all"
-              title="Download Report"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Answered</span>
+                  <span className="font-medium text-slate-900">{completedQuestions}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Time Elapsed</span>
+                  <span className="font-medium text-slate-900">{formatTime(timeElapsed)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Avg. Score</span>
+                  <span
+                    className={`font-medium ${getScoreColor(
+                      completedQuestions > 0
+                        ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+                            completedQuestions
+                        : 0,
+                    )}`}
+                  >
+                    {completedQuestions > 0
+                      ? (
+                          session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+                          completedQuestions
+                        ).toFixed(1)
+                      : "N/A"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

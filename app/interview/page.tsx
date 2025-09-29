@@ -1,6 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -22,6 +26,7 @@ import {
 import { DashboardNav } from "@/components/dashboard-nav"
 import { AIProviderSelector } from "@/components/ai-provider-selector"
 import { type AIProvider, getUserPreferredProvider } from "@/lib/ai-provider"
+import { generateInterviewQuestions } from "@/lib/ai-interview"
 
 const JOB_ROLES = [
   { value: "Full Stack Developer", icon: Code, color: "text-blue-500" },
@@ -80,30 +85,62 @@ export default function InterviewSetupPage() {
   const [difficulty, setDifficulty] = useState("intermediate")
   const [isStarting, setIsStarting] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(() => getUserPreferredProvider())
+  
+  const router = useRouter()
+  const { user } = useUser()
+  const createSession = useMutation(api.interviews.createSession)
+  const createNewUser = useMutation(api.users.CreateNewUser)
+  const currentUser = useQuery(api.users.getCurrentUser)
 
   const handleStartInterview = async () => {
-    if (!jobRole || !interviewType) return
+    if (!jobRole || !interviewType || !user) return
 
     setIsStarting(true)
 
-    const sessionId = `session_${Date.now()}`
-    const interviewConfig = {
-      jobRole,
-      interviewType,
-      sessionType,
-      difficulty,
-      aiProvider: selectedProvider,
-      startTime: Date.now(),
+    try {
+      // Ensure user exists in Convex database
+      let convexUser = currentUser
+      if (!convexUser) {
+        // Create user in Convex database if doesn't exist
+        convexUser = await createNewUser({
+          email: user.emailAddresses[0]?.emailAddress || '',
+          name: user.fullName || user.firstName || 'Anonymous',
+          imageUrl: user.imageUrl || '',
+        })
+      }
+
+      if (!convexUser) {
+        throw new Error('Failed to create or retrieve user')
+      }
+
+      // Generate AI questions based on role, type, and difficulty
+      const questions = await generateInterviewQuestions(jobRole, interviewType, difficulty)
+      
+      // Create session in backend with proper Convex user ID
+      const sessionId = await createSession({
+        userId: convexUser._id,
+        jobRole,
+        sessionType,
+        questions,
+      })
+
+      // Store additional config in localStorage for the session
+      const sessionConfig = {
+        interviewType,
+        difficulty,
+        aiProvider: selectedProvider,
+        startTime: Date.now(),
+      }
+      localStorage.setItem(`interview_config_${sessionId}`, JSON.stringify(sessionConfig))
+
+      // Navigate to the interview session
+      router.push(`/interview/${sessionId}`)
+    } catch (error) {
+      console.error('Failed to start interview:', error)
+      alert('Failed to start interview. Please try again.')
+    } finally {
+      setIsStarting(false)
     }
-
-    // Note: In a real application, this would be sent to a backend
-    // localStorage.setItem(`interview_${sessionId}`, JSON.stringify(interviewConfig))
-
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    // In real app: router.push(`/interview/${sessionId}`)
-    alert(`Interview session ${sessionId} would start now with ${selectedProvider}!`)
-    setIsStarting(false)
   }
 
   const handleProviderChange = (provider: AIProvider) => {
@@ -249,20 +286,14 @@ export default function InterviewSetupPage() {
                     </div>
                   </div>
                   <div
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                      sessionType === "voice"
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                        : "border-slate-200 dark:border-slate-700 hover:border-blue-300"
-                    }`}
-                    onClick={() => setSessionType("voice")}
+                    className="p-4 rounded-lg border-2 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed"
                   >
                     <div className="flex items-center space-x-3">
-                      <Mic className="w-5 h-5 text-blue-600" />
+                      <Mic className="w-5 h-5 text-slate-400" />
                       <div>
-                        <span className="font-medium text-slate-900 dark:text-slate-100">Voice Chat</span>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Speak naturally</p>
+                        <span className="font-medium text-slate-500 dark:text-slate-400">Voice Chat</span>
+                        <p className="text-sm text-slate-400 dark:text-slate-500">Coming soon</p>
                       </div>
-                      {sessionType === "voice" && <CheckCircle className="w-4 h-4 text-blue-500 ml-auto" />}
                     </div>
                   </div>
                 </CardContent>

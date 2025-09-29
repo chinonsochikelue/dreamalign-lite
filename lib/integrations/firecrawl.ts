@@ -45,10 +45,10 @@ const COURSE_SITES = [
 ]
 
 export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[]> {
-  console.log(`[v0] Starting job scraping for query: ${query}, limit: ${limit}`)
+  console.log(`Starting job scraping for query: ${query}, limit: ${limit}`)
 
   if (!process.env.FIRECRAWL_API_KEY) {
-    console.warn("[v0] FIRECRAWL_API_KEY not found, returning sample data")
+    console.warn("FIRECRAWL_API_KEY not found, returning sample data")
     return generateSampleJobs(query, limit)
   }
 
@@ -57,7 +57,7 @@ export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[
 
   for (const site of sitesToScrape) {
     try {
-      console.log(`[v0] Scraping jobs from: ${site}`)
+      console.log(`Scraping jobs from: ${site}`)
 
       const result = await firecrawl.scrape(site, {
         formats: ["markdown", "html"],
@@ -68,20 +68,20 @@ export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[
       if (result.success && result.markdown) {
         const extractedJobs = extractJobsFromContent(result.markdown, query)
         jobs.push(...extractedJobs.slice(0, Math.floor(limit / sitesToScrape.length)))
-        console.log(`[v0] Extracted ${extractedJobs.length} jobs from ${site}`)
+        console.log(`Extracted ${extractedJobs.length} jobs from ${site}`)
       }
 
       // Rate limiting
       await new Promise((resolve) => setTimeout(resolve, 1000))
     } catch (error) {
-      console.error(`[v0] Error scraping ${site}:`, error)
+      console.error(`Error scraping ${site}:`, error)
       continue
     }
   }
 
   // If no jobs found, return sample data
   if (jobs.length === 0) {
-    console.log("[v0] No jobs scraped, returning sample data")
+    console.log("No jobs scraped, returning sample data")
     return generateSampleJobs(query, limit)
   }
 
@@ -89,7 +89,7 @@ export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[
 }
 
 export async function batchScrapeJobs(queries: string[], limitPerQuery = 10): Promise<JobListing[]> {
-  console.log(`[v0] Starting batch job scraping for ${queries.length} queries`)
+  console.log(`Starting batch job scraping for ${queries.length} queries`)
 
   const allJobs: JobListing[] = []
 
@@ -97,12 +97,12 @@ export async function batchScrapeJobs(queries: string[], limitPerQuery = 10): Pr
     try {
       const jobs = await scrapeJobs(query, limitPerQuery)
       allJobs.push(...jobs)
-      console.log(`[v0] Scraped ${jobs.length} jobs for query: ${query}`)
+      console.log(`Scraped ${jobs.length} jobs for query: ${query}`)
 
       // Rate limiting between queries
       await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
-      console.error(`[v0] Error scraping jobs for query ${query}:`, error)
+      console.error(`Error scraping jobs for query ${query}:`, error)
       continue
     }
   }
@@ -111,10 +111,10 @@ export async function batchScrapeJobs(queries: string[], limitPerQuery = 10): Pr
 }
 
 export async function scrapeCourses(query: string, limit = 20): Promise<CourseListing[]> {
-  console.log(`[v0] Starting course scraping for query: ${query}, limit: ${limit}`)
+  console.log(`Starting course scraping for query: ${query}, limit: ${limit}`)
 
   if (!process.env.FIRECRAWL_API_KEY) {
-    console.warn("[v0] FIRECRAWL_API_KEY not found, returning sample data")
+    console.warn("FIRECRAWL_API_KEY not found, returning sample data")
     return generateSampleCourses(query, limit)
   }
 
@@ -123,7 +123,7 @@ export async function scrapeCourses(query: string, limit = 20): Promise<CourseLi
 
   for (const site of sitesToScrape) {
     try {
-      console.log(`[v0] Scraping courses from: ${site}`)
+      console.log(`Scraping courses from: ${site}`)
 
       const result = await firecrawl.scrape(site, {
         formats: ["markdown", "html"],
@@ -134,20 +134,20 @@ export async function scrapeCourses(query: string, limit = 20): Promise<CourseLi
       if (result.success && result.markdown) {
         const extractedCourses = extractCoursesFromContent(result.markdown, query)
         courses.push(...extractedCourses.slice(0, Math.floor(limit / sitesToScrape.length)))
-        console.log(`[v0] Extracted ${extractedCourses.length} courses from ${site}`)
+        console.log(`Extracted ${extractedCourses.length} courses from ${site}`)
       }
 
       // Rate limiting
       await new Promise((resolve) => setTimeout(resolve, 1000))
     } catch (error) {
-      console.error(`[v0] Error scraping ${site}:`, error)
+      console.error(`Error scraping ${site}:`, error)
       continue
     }
   }
 
   // If no courses found, return sample data
   if (courses.length === 0) {
-    console.log("[v0] No courses scraped, returning sample data")
+    console.log("No courses scraped, returning sample data")
     return generateSampleCourses(query, limit)
   }
 
@@ -155,7 +155,7 @@ export async function scrapeCourses(query: string, limit = 20): Promise<CourseLi
 }
 
 export async function batchScrapeCourses(queries: string[], limitPerQuery = 10): Promise<CourseListing[]> {
-  console.log(`[v0] Starting batch course scraping for ${queries.length} queries`)
+  console.log(`Starting batch course scraping for ${queries.length} queries`)
 
   const allCourses: CourseListing[] = []
 
@@ -163,12 +163,12 @@ export async function batchScrapeCourses(queries: string[], limitPerQuery = 10):
     try {
       const courses = await scrapeCourses(query, limitPerQuery)
       allCourses.push(...courses)
-      console.log(`[v0] Scraped ${courses.length} courses for query: ${query}`)
+      console.log(`Scraped ${courses.length} courses for query: ${query}`)
 
       // Rate limiting between queries
       await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
-      console.error(`[v0] Error scraping courses for query ${query}:`, error)
+      console.error(`Error scraping courses for query ${query}:`, error)
       continue
     }
   }

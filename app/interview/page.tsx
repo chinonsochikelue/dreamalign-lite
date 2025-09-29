@@ -3,10 +3,25 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Brain, MessageSquare, Mic, Clock, Target, ArrowRight, CheckCircle, Sparkles, Award, TrendingUp, Users, Code, Briefcase } from "lucide-react"
+import {
+  Brain,
+  MessageSquare,
+  Mic,
+  Clock,
+  Target,
+  ArrowRight,
+  CheckCircle,
+  Sparkles,
+  Award,
+  TrendingUp,
+  Users,
+  Code,
+  Briefcase,
+} from "lucide-react"
 import { DashboardNav } from "@/components/dashboard-nav"
+import { AIProviderSelector } from "@/components/ai-provider-selector"
+import { type AIProvider, getUserPreferredProvider } from "@/lib/ai-provider"
 
 const JOB_ROLES = [
   { value: "Full Stack Developer", icon: Code, color: "text-blue-500" },
@@ -22,33 +37,33 @@ const JOB_ROLES = [
 ]
 
 const INTERVIEW_TYPES = [
-  { 
-    id: "technical", 
-    label: "Technical Interview", 
+  {
+    id: "technical",
+    label: "Technical Interview",
     description: "Coding challenges and technical problem-solving",
     icon: Code,
-    color: "bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-950 dark:border-blue-800"
+    color: "bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-950 dark:border-blue-800",
   },
-  { 
-    id: "behavioral", 
-    label: "Behavioral Interview", 
+  {
+    id: "behavioral",
+    label: "Behavioral Interview",
     description: "Leadership scenarios and experience-based questions",
     icon: Users,
-    color: "bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-950 dark:border-green-800"
+    color: "bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-950 dark:border-green-800",
   },
-  { 
-    id: "system-design", 
-    label: "System Design", 
+  {
+    id: "system-design",
+    label: "System Design",
     description: "Architecture patterns and scalability challenges",
     icon: Award,
-    color: "bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-950 dark:border-purple-800"
+    color: "bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-950 dark:border-purple-800",
   },
-  { 
-    id: "general", 
-    label: "General Interview", 
+  {
+    id: "general",
+    label: "General Interview",
     description: "Mixed technical and behavioral assessment",
     icon: Target,
-    color: "bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800"
+    color: "bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800",
   },
 ]
 
@@ -64,44 +79,46 @@ export default function InterviewSetupPage() {
   const [sessionType, setSessionType] = useState<"text" | "voice">("text")
   const [difficulty, setDifficulty] = useState("intermediate")
   const [isStarting, setIsStarting] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider>(() => getUserPreferredProvider())
 
   const handleStartInterview = async () => {
     if (!jobRole || !interviewType) return
 
     setIsStarting(true)
 
-    // Generate session ID and store interview config
     const sessionId = `session_${Date.now()}`
     const interviewConfig = {
       jobRole,
       interviewType,
       sessionType,
       difficulty,
+      aiProvider: selectedProvider,
       startTime: Date.now(),
     }
 
     // Note: In a real application, this would be sent to a backend
     // localStorage.setItem(`interview_${sessionId}`, JSON.stringify(interviewConfig))
 
-    // Simulate setup delay
     await new Promise((resolve) => setTimeout(resolve, 2000))
-    
+
     // In real app: router.push(`/interview/${sessionId}`)
-    alert(`Interview session ${sessionId} would start now!`)
+    alert(`Interview session ${sessionId} would start now with ${selectedProvider}!`)
     setIsStarting(false)
   }
 
+  const handleProviderChange = (provider: AIProvider) => {
+    setSelectedProvider(provider)
+  }
+
   const isReadyToStart = jobRole && interviewType
-  const selectedJobRole = JOB_ROLES.find(role => role.value === jobRole)
-  const selectedInterviewType = INTERVIEW_TYPES.find(type => type.id === interviewType)
+  const selectedJobRole = JOB_ROLES.find((role) => role.value === jobRole)
+  const selectedInterviewType = INTERVIEW_TYPES.find((type) => type.id === interviewType)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
-      {/* Enhanced Navigation */}
       <DashboardNav />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Hero Section */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900/50 rounded-full text-blue-700 dark:text-blue-300 text-sm font-medium mb-6">
             <Sparkles className="w-4 h-4 mr-2" />
@@ -111,23 +128,20 @@ export default function InterviewSetupPage() {
             Master Your Next Interview
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Practice with our AI interviewer, get real-time feedback, and build the confidence you need to land your dream job.
+            Practice with our AI interviewer, get real-time feedback, and build the confidence you need to land your
+            dream job.
           </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Setup Form */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Job Role Selection */}
             <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
               <CardHeader className="pb-6">
                 <CardTitle className="text-2xl flex items-center">
                   <Briefcase className="w-6 h-6 mr-3 text-blue-600" />
                   Choose Your Role
                 </CardTitle>
-                <CardDescription className="text-base">
-                  Select the position you're preparing for
-                </CardDescription>
+                <CardDescription className="text-base">Select the position you're preparing for</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -137,8 +151,8 @@ export default function InterviewSetupPage() {
                       <div
                         key={role.value}
                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                          jobRole === role.value 
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg" 
+                          jobRole === role.value
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg"
                             : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300 hover:shadow-md"
                         }`}
                         onClick={() => setJobRole(role.value)}
@@ -155,7 +169,6 @@ export default function InterviewSetupPage() {
               </CardContent>
             </Card>
 
-            {/* Interview Type Selection */}
             <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
               <CardHeader className="pb-6">
                 <CardTitle className="text-2xl flex items-center">
@@ -174,8 +187,8 @@ export default function InterviewSetupPage() {
                       <div
                         key={type.id}
                         className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                          interviewType === type.id 
-                            ? `border-blue-500 ${type.color} shadow-lg` 
+                          interviewType === type.id
+                            ? `border-blue-500 ${type.color} shadow-lg`
                             : `border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md`
                         }`}
                         onClick={() => setInterviewType(type.id)}
@@ -184,7 +197,9 @@ export default function InterviewSetupPage() {
                           <Icon className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                           <div className="flex-1">
                             <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">{type.label}</h4>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{type.description}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                              {type.description}
+                            </p>
                           </div>
                           {interviewType === type.id && <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />}
                         </div>
@@ -195,9 +210,22 @@ export default function InterviewSetupPage() {
               </CardContent>
             </Card>
 
-            {/* Session Configuration */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-2xl flex items-center">
+                  <Brain className="w-6 h-6 mr-3 text-purple-600" />
+                  AI Interview Coach
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Choose your preferred AI interviewer for personalized questions and feedback
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AIProviderSelector onProviderChange={handleProviderChange} showDescription={true} compact={false} />
+              </CardContent>
+            </Card>
+
             <div className="grid sm:grid-cols-2 gap-6">
-              {/* Session Type */}
               <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg">Session Format</CardTitle>
@@ -205,8 +233,8 @@ export default function InterviewSetupPage() {
                 <CardContent className="space-y-3">
                   <div
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                      sessionType === "text" 
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950" 
+                      sessionType === "text"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
                         : "border-slate-200 dark:border-slate-700 hover:border-blue-300"
                     }`}
                     onClick={() => setSessionType("text")}
@@ -222,8 +250,8 @@ export default function InterviewSetupPage() {
                   </div>
                   <div
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                      sessionType === "voice" 
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950" 
+                      sessionType === "voice"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
                         : "border-slate-200 dark:border-slate-700 hover:border-blue-300"
                     }`}
                     onClick={() => setSessionType("voice")}
@@ -240,7 +268,6 @@ export default function InterviewSetupPage() {
                 </CardContent>
               </Card>
 
-              {/* Difficulty Level */}
               <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg">Difficulty Level</CardTitle>
@@ -265,7 +292,6 @@ export default function InterviewSetupPage() {
               </Card>
             </div>
 
-            {/* Start Button */}
             <Card className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
               <CardContent className="p-8">
                 <div className="text-center space-y-6">
@@ -282,9 +308,11 @@ export default function InterviewSetupPage() {
                       </div>
                       <span className="text-blue-200">•</span>
                       <span className="text-sm capitalize">{difficulty}</span>
+                      <span className="text-blue-200">•</span>
+                      <span className="text-sm capitalize">{selectedProvider}</span>
                     </div>
                   )}
-                  
+
                   <Button
                     onClick={handleStartInterview}
                     disabled={!isReadyToStart || isStarting}
@@ -310,9 +338,7 @@ export default function InterviewSetupPage() {
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Features Card */}
             <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg">
@@ -325,7 +351,7 @@ export default function InterviewSetupPage() {
                   { icon: Brain, title: "AI-Powered Questions", desc: "Tailored to your role and experience level" },
                   { icon: TrendingUp, title: "Real-time Analysis", desc: "Instant feedback on communication skills" },
                   { icon: Award, title: "Performance Scoring", desc: "Detailed metrics and improvement areas" },
-                  { icon: Target, title: "Personalized Tips", desc: "Custom advice based on your responses" }
+                  { icon: Target, title: "Personalized Tips", desc: "Custom advice based on your responses" },
                 ].map((feature, index) => (
                   <div key={index} className="flex items-start space-x-3">
                     <feature.icon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -338,7 +364,6 @@ export default function InterviewSetupPage() {
               </CardContent>
             </Card>
 
-            {/* Session Info */}
             <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg">
@@ -351,7 +376,7 @@ export default function InterviewSetupPage() {
                   { label: "Duration", value: "15-30 minutes" },
                   { label: "Questions", value: "5-8 adaptive questions" },
                   { label: "Feedback", value: "Instant + detailed report" },
-                  { label: "Practice Mode", value: "Unlimited retakes" }
+                  { label: "Practice Mode", value: "Unlimited retakes" },
                 ].map((item, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-slate-600 dark:text-slate-400">{item.label}:</span>

@@ -29,6 +29,7 @@ import {
   Zap,
 } from "lucide-react"
 import { useAnalytics } from "@/lib/analytics"
+import { type AIProvider, getAIService, getUserPreferredProvider, getProviderConfig } from "@/lib/ai-provider"
 
 interface Question {
   id: number
@@ -47,6 +48,7 @@ interface InterviewSession {
   interviewType: string
   sessionType: "text" | "voice"
   difficulty: string
+  aiProvider?: AIProvider
   startTime: number
   questions: Question[]
   currentQuestionIndex: number
@@ -60,6 +62,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
     interviewType: "general",
     sessionType: "text",
     difficulty: "intermediate",
+    aiProvider: getUserPreferredProvider(),
     startTime: Date.now(),
     questions: [
       {
@@ -155,71 +158,143 @@ export default function EnhancedOriginalInterviewSessionPage() {
       timeSpent,
     )
 
-    // Simulate AI evaluation
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const aiService = getAIService(session.aiProvider || "openai")
+      const currentQuestion = session.questions[session.currentQuestionIndex]
 
-    // Mock evaluation based on answer length and content
-    const mockScore = Math.floor(Math.random() * 3) + 7 // 7-10 score
-    const mockFeedback = generateMockFeedback(currentAnswer, session.questions[session.currentQuestionIndex].category)
+      console.log(`[v0] Using ${session.aiProvider} for answer evaluation`)
 
-    analytics.trackQuestionAnswered(
-      session.currentQuestionIndex,
-      session.questions[session.currentQuestionIndex].category || "general",
-      timeSpent,
-      mockScore,
-    )
+      const evaluation = await aiService.evaluateInterviewAnswer(
+        currentQuestion.question,
+        currentAnswer,
+        session.jobRole,
+      )
 
-    const currentQuestion = session.questions[session.currentQuestionIndex]
-    const updatedQuestions = [...session.questions]
-    updatedQuestions[session.currentQuestionIndex] = {
-      ...currentQuestion,
-      answer: currentAnswer,
-      feedback: mockFeedback,
-      score: mockScore,
-      isAnswered: true,
-      timeSpent,
-    }
+      console.log(`[v0] AI evaluation completed:`, evaluation)
 
-    const updatedSession = {
-      ...session,
-      questions: updatedQuestions,
-    }
+      analytics.trackQuestionAnswered(
+        session.currentQuestionIndex,
+        currentQuestion.category || "general",
+        timeSpent,
+        evaluation.score,
+      )
 
-    setSession(updatedSession)
-    setCurrentAnswer("")
-    setSavedDraft("")
-    setIsSubmitting(false)
-    setShowHints(false)
-
-    // Store in localStorage for persistence
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`interview_session`, JSON.stringify(updatedSession))
-    }
-
-    // Auto-advance after showing feedback
-    setTimeout(() => {
-      if (session.currentQuestionIndex < session.questions.length - 1) {
-        setSession((prev) => ({
-          ...prev,
-          currentQuestionIndex: prev.currentQuestionIndex + 1,
-        }))
-        setQuestionStartTime(Date.now())
-      } else {
-        // Interview completed
-        const completedSession = { ...updatedSession, isCompleted: true }
-        setSession(completedSession)
-
-        const averageScore =
-          completedSession.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
-          completedSession.questions.length
-
-        analytics.trackInterviewCompleted(completedSession.questions.length, averageScore, timeElapsed)
-
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`interview_session`, JSON.stringify(completedSession))
-        }
+      const updatedQuestions = [...session.questions]
+      updatedQuestions[session.currentQuestionIndex] = {
+        ...currentQuestion,
+        answer: currentAnswer,
+        feedback: evaluation.feedback,
+        score: evaluation.score,
+        isAnswered: true,
+        timeSpent,
       }
-    }, 4000)
+
+      const updatedSession = {
+        ...session,
+        questions: updatedQuestions,
+      }
+
+      setSession(updatedSession)
+      setCurrentAnswer("")
+      setSavedDraft("")
+      setIsSubmitting(false)
+      setShowHints(false)
+
+      // Store in localStorage for persistence
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`interview_session`, JSON.stringify(updatedSession))
+      }
+
+      // Auto-advance after showing feedback
+      setTimeout(() => {
+        if (session.currentQuestionIndex < session.questions.length - 1) {
+          setSession((prev) => ({
+            ...prev,
+            currentQuestionIndex: prev.currentQuestionIndex + 1,
+          }))
+          setQuestionStartTime(Date.now())
+        } else {
+          // Interview completed
+          const completedSession = { ...updatedSession, isCompleted: true }
+          setSession(completedSession)
+
+          const averageScore =
+            completedSession.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+            completedSession.questions.length
+
+          analytics.trackInterviewCompleted(completedSession.questions.length, averageScore, timeElapsed)
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`interview_session`, JSON.stringify(completedSession))
+          }
+        }
+      }, 4000)
+    } catch (error) {
+      console.error(`[v0] Error with ${session.aiProvider} evaluation:`, error)
+
+      // Fallback to mock evaluation
+      const mockScore = Math.floor(Math.random() * 3) + 7 // 7-10 score
+      const mockFeedback = generateMockFeedback(currentAnswer, session.questions[session.currentQuestionIndex].category)
+
+      analytics.trackQuestionAnswered(
+        session.currentQuestionIndex,
+        session.questions[session.currentQuestionIndex].category || "general",
+        timeSpent,
+        mockScore,
+      )
+
+      const currentQuestion = session.questions[session.currentQuestionIndex]
+      const updatedQuestions = [...session.questions]
+      updatedQuestions[session.currentQuestionIndex] = {
+        ...currentQuestion,
+        answer: currentAnswer,
+        feedback: mockFeedback,
+        score: mockScore,
+        isAnswered: true,
+        timeSpent,
+      }
+
+      const updatedSession = {
+        ...session,
+        questions: updatedQuestions,
+      }
+
+      setSession(updatedSession)
+      setCurrentAnswer("")
+      setSavedDraft("")
+      setIsSubmitting(false)
+      setShowHints(false)
+
+      // Store in localStorage for persistence
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`interview_session`, JSON.stringify(updatedSession))
+      }
+
+      // Auto-advance after showing feedback
+      setTimeout(() => {
+        if (session.currentQuestionIndex < session.questions.length - 1) {
+          setSession((prev) => ({
+            ...prev,
+            currentQuestionIndex: prev.currentQuestionIndex + 1,
+          }))
+          setQuestionStartTime(Date.now())
+        } else {
+          // Interview completed
+          const completedSession = { ...updatedSession, isCompleted: true }
+          setSession(completedSession)
+
+          const averageScore =
+            completedSession.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+            completedSession.questions.length
+
+          analytics.trackInterviewCompleted(completedSession.questions.length, averageScore, timeElapsed)
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`interview_session`, JSON.stringify(completedSession))
+          }
+        }
+      }, 4000)
+    }
   }
 
   const generateMockFeedback = (answer: string, category?: string) => {
@@ -304,6 +379,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
   const progress =
     ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
   const completedQuestions = session.questions.filter((q) => q.isAnswered).length
+  const providerConfig = getProviderConfig(session.aiProvider || "openai")
 
   if (isLoading) {
     return (
@@ -354,6 +430,12 @@ export default function EnhancedOriginalInterviewSessionPage() {
                 </div>
               </div>
 
+              <div className="mb-8">
+                <Badge variant="outline" className="px-3 py-1">
+                  Powered by {providerConfig.name} {providerConfig.icon}
+                </Badge>
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button
                   size="lg"
@@ -390,6 +472,11 @@ export default function EnhancedOriginalInterviewSessionPage() {
                   <span>{session.interviewType}</span>
                   <span>•</span>
                   <span>{session.difficulty}</span>
+                  <span>•</span>
+                  <span className="flex items-center space-x-1">
+                    <span>{providerConfig.name}</span>
+                    <span>{providerConfig.icon}</span>
+                  </span>
                   {session.isPaused && (
                     <>
                       <span>•</span>

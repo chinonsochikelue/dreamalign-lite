@@ -1,382 +1,359 @@
 import FirecrawlApp from "@mendable/firecrawl-js"
 
-export interface ScrapedJob {
-  title: string
-  company: string
-  location: string
-  description: string
-  requirements: string[]
-  skills: string[]
-  salaryRange?: {
-    min: number
-    max: number
-    currency: string
-  }
-  url: string
-}
-
-export interface ScrapedCourse {
-  title: string
-  provider: string
-  description: string
-  skills: string[]
-  level: string
-  duration: string
-  price?: number
-  rating?: number
-  url: string
-}
-
 // Initialize Firecrawl client
 const firecrawl = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY || "",
 })
 
-// Job scraping sites configuration
+export interface JobListing {
+  title: string
+  company: string
+  location: string
+  description: string
+  url: string
+  salary?: string
+  type?: string
+  remote?: boolean
+  skills?: string[]
+}
+
+export interface CourseListing {
+  title: string
+  provider: string
+  description: string
+  url: string
+  price?: string
+  duration?: string
+  level?: string
+  skills?: string[]
+}
+
+// Job scraping sites with better accessibility
 const JOB_SITES = [
-  {
-    name: "LinkedIn",
-    baseUrl: "https://www.linkedin.com/jobs/search",
-    searchParam: "keywords",
-    selector: ".job-search-card",
-  },
-  {
-    name: "Indeed",
-    baseUrl: "https://www.indeed.com/jobs",
-    searchParam: "q",
-    selector: ".jobsearch-SerpJobCard",
-  },
-  {
-    name: "AngelList",
-    baseUrl: "https://angel.co/jobs",
-    searchParam: "query",
-    selector: ".job-listing",
-  },
+  "https://remoteok.io/remote-dev-jobs",
+  "https://weworkremotely.com/categories/remote-programming-jobs",
+  "https://angel.co/jobs",
+  "https://stackoverflow.com/jobs",
 ]
 
-// Course scraping sites configuration
+// Course scraping sites
 const COURSE_SITES = [
-  {
-    name: "Coursera",
-    baseUrl: "https://www.coursera.org/search",
-    searchParam: "query",
-    selector: ".cds-CommonCard-container",
-  },
-  {
-    name: "Udemy",
-    baseUrl: "https://www.udemy.com/courses/search",
-    searchParam: "q",
-    selector: ".course-card--container",
-  },
-  {
-    name: "edX",
-    baseUrl: "https://www.edx.org/search",
-    searchParam: "q",
-    selector: ".discovery-card",
-  },
+  "https://www.freecodecamp.org/learn",
+  "https://www.coursera.org/browse/computer-science",
+  "https://www.edx.org/learn/computer-science",
+  "https://www.udemy.com/courses/development/",
 ]
 
-// Extract job data from scraped content
-function extractJobData(content: string, url: string, siteName: string): ScrapedJob | null {
-  try {
-    // Use regex patterns to extract job information
-    const titleMatch = content.match(
-      /<h[1-3][^>]*>([^<]+(?:developer|engineer|manager|analyst|designer)[^<]*)<\/h[1-3]>/i,
-    )
-    const companyMatch = content.match(/company[^>]*>([^<]+)</i) || content.match(/employer[^>]*>([^<]+)</i)
-    const locationMatch = content.match(/location[^>]*>([^<]+)</i) || content.match(/city[^>]*>([^<]+)</i)
-    const descriptionMatch = content.match(/description[^>]*>([^<]{100,500})</i)
+export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[]> {
+  console.log(`[v0] Starting job scraping for query: ${query}, limit: ${limit}`)
 
-    // Extract salary information
-    const salaryMatch = content.match(/\$(\d{1,3}(?:,\d{3})*(?:k|K)?)\s*-?\s*\$?(\d{1,3}(?:,\d{3})*(?:k|K)?)/)
-
-    // Extract skills from content
-    const skillsPattern =
-      /(JavaScript|TypeScript|React|Vue|Angular|Node\.js|Python|Java|C\+\+|SQL|AWS|Docker|Kubernetes|Git|HTML|CSS|MongoDB|PostgreSQL|Redis|GraphQL|REST|API|Agile|Scrum)/gi
-    const skillsMatches = content.match(skillsPattern) || []
-    const skills = [...new Set(skillsMatches.map((s) => s.toLowerCase()))]
-
-    if (!titleMatch) return null
-
-    const job: ScrapedJob = {
-      title: titleMatch[1].trim(),
-      company: companyMatch?.[1]?.trim() || "Unknown Company",
-      location: locationMatch?.[1]?.trim() || "Remote",
-      description: descriptionMatch?.[1]?.trim() || "No description available",
-      requirements: extractRequirements(content),
-      skills,
-      url,
-    }
-
-    // Add salary range if found
-    if (salaryMatch) {
-      const min =
-        Number.parseInt(salaryMatch[1].replace(/[,k]/gi, "")) * (salaryMatch[1].toLowerCase().includes("k") ? 1000 : 1)
-      const max = salaryMatch[2]
-        ? Number.parseInt(salaryMatch[2].replace(/[,k]/gi, "")) *
-          (salaryMatch[2].toLowerCase().includes("k") ? 1000 : 1)
-        : min
-      job.salaryRange = { min, max, currency: "USD" }
-    }
-
-    return job
-  } catch (error) {
-    console.error("Error extracting job data:", error)
-    return null
+  if (!process.env.FIRECRAWL_API_KEY) {
+    console.warn("[v0] FIRECRAWL_API_KEY not found, returning sample data")
+    return generateSampleJobs(query, limit)
   }
-}
 
-// Extract course data from scraped content
-function extractCourseData(content: string, url: string, siteName: string): ScrapedCourse | null {
-  try {
-    const titleMatch = content.match(/<h[1-3][^>]*>([^<]+(?:course|tutorial|bootcamp|certification)[^<]*)<\/h[1-3]>/i)
-    const providerMatch = content.match(/instructor[^>]*>([^<]+)</i) || content.match(/author[^>]*>([^<]+)</i)
-    const descriptionMatch = content.match(/description[^>]*>([^<]{100,500})</i)
-    const priceMatch = content.match(/\$(\d+(?:\.\d{2})?)/)
-    const ratingMatch = content.match(/(\d\.\d)\s*(?:stars?|rating)/i)
-    const durationMatch = content.match(/(\d+(?:\.\d+)?)\s*(hours?|weeks?|months?)/i)
-    const levelMatch = content.match(/(beginner|intermediate|advanced|expert)/i)
+  const jobs: JobListing[] = []
+  const sitesToScrape = JOB_SITES.slice(0, Math.min(2, Math.ceil(limit / 10)))
 
-    // Extract skills
-    const skillsPattern =
-      /(JavaScript|TypeScript|React|Vue|Angular|Node\.js|Python|Java|C\+\+|SQL|AWS|Docker|Kubernetes|Git|HTML|CSS|MongoDB|PostgreSQL|Redis|GraphQL|REST|API|Machine Learning|Data Science|AI|UX|UI)/gi
-    const skillsMatches = content.match(skillsPattern) || []
-    const skills = [...new Set(skillsMatches.map((s) => s.toLowerCase()))]
+  for (const site of sitesToScrape) {
+    try {
+      console.log(`[v0] Scraping jobs from: ${site}`)
 
-    if (!titleMatch) return null
+      const result = await firecrawl.scrape(site, {
+        formats: ["markdown", "html"],
+        onlyMainContent: true,
+        timeout: 30000,
+      })
 
-    const course: ScrapedCourse = {
-      title: titleMatch[1].trim(),
-      provider: providerMatch?.[1]?.trim() || siteName,
-      description: descriptionMatch?.[1]?.trim() || "No description available",
-      skills,
-      level: levelMatch?.[1]?.toLowerCase() || "beginner",
-      duration: durationMatch ? `${durationMatch[1]} ${durationMatch[2]}` : "Self-paced",
-      url,
-    }
-
-    if (priceMatch) {
-      course.price = Number.parseFloat(priceMatch[1])
-    }
-
-    if (ratingMatch) {
-      course.rating = Number.parseFloat(ratingMatch[1])
-    }
-
-    return course
-  } catch (error) {
-    console.error("Error extracting course data:", error)
-    return null
-  }
-}
-
-// Extract requirements from job content
-function extractRequirements(content: string): string[] {
-  const requirementsPattern = /(?:requirements?|qualifications?|must have|needed)[^:]*:([^.]+(?:\.[^.]+)*)/gi
-  const matches = content.match(requirementsPattern)
-
-  if (!matches) return []
-
-  const requirements: string[] = []
-  matches.forEach((match) => {
-    const items = match
-      .split(/[,;•\n]/)
-      .map((item) => item.trim())
-      .filter((item) => item.length > 10)
-    requirements.push(...items)
-  })
-
-  return requirements.slice(0, 5) // Limit to 5 requirements
-}
-
-// Scrape jobs from multiple sites
-export async function scrapeJobs(query: string, limit = 20): Promise<ScrapedJob[]> {
-  const jobs: ScrapedJob[] = []
-
-  try {
-    for (const site of JOB_SITES) {
-      if (jobs.length >= limit) break
-
-      const searchUrl = `${site.baseUrl}?${site.searchParam}=${encodeURIComponent(query)}`
-
-      try {
-        console.log(`Scraping jobs from ${site.name}: ${searchUrl}`)
-
-        const scrapeResult = await firecrawl.scrape(searchUrl, {
-          formats: ["markdown", "html"],
-          includeTags: ["h1", "h2", "h3", "p", "div", "span", "a"],
-          excludeTags: ["script", "style", "nav", "footer", "header"],
-          waitFor: 2000,
-        })
-
-        if (scrapeResult.success && scrapeResult.data?.html) {
-          const extractedJob = extractJobData(scrapeResult.data.html, searchUrl, site.name)
-          if (extractedJob) {
-            jobs.push(extractedJob)
-          }
-        }
-      } catch (siteError) {
-        console.error(`Error scraping ${site.name}:`, siteError)
-        continue
+      if (result.success && result.markdown) {
+        const extractedJobs = extractJobsFromContent(result.markdown, query)
+        jobs.push(...extractedJobs.slice(0, Math.floor(limit / sitesToScrape.length)))
+        console.log(`[v0] Extracted ${extractedJobs.length} jobs from ${site}`)
       }
-    }
 
-    // If we didn't get enough jobs from scraping, add some fallback data
-    if (jobs.length < 3) {
-      console.log(`Adding fallback job data, only found ${jobs.length} jobs`)
-      jobs.push(...getFallbackJobs(query).slice(0, limit - jobs.length))
+      // Rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    } catch (error) {
+      console.error(`[v0] Error scraping ${site}:`, error)
+      continue
     }
-
-    console.log(`Successfully scraped ${jobs.length} jobs for query: ${query}`)
-    return jobs.slice(0, limit)
-  } catch (error) {
-    console.error("Error in scrapeJobs:", error)
-    // Return fallback data on error
-    return getFallbackJobs(query).slice(0, limit)
   }
-}
 
-// Scrape courses from multiple sites
-export async function scrapeCourses(query: string, limit = 15): Promise<ScrapedCourse[]> {
-  const courses: ScrapedCourse[] = []
-
-  try {
-    for (const site of COURSE_SITES) {
-      if (courses.length >= limit) break
-
-      const searchUrl = `${site.baseUrl}?${site.searchParam}=${encodeURIComponent(query)}`
-
-      try {
-        console.log(`Scraping courses from ${site.name}: ${searchUrl}`)
-
-        const scrapeResult = await firecrawl.scrape(searchUrl, {
-          formats: ["markdown", "html"],
-          includeTags: ["h1", "h2", "h3", "p", "div", "span", "a"],
-          excludeTags: ["script", "style", "nav", "footer", "header"],
-          waitFor: 2000,
-        })
-
-        if (scrapeResult.success && scrapeResult.data?.html) {
-          const extractedCourse = extractCourseData(scrapeResult.data.html, searchUrl, site.name)
-          if (extractedCourse) {
-            courses.push(extractedCourse)
-          }
-        }
-      } catch (siteError) {
-        console.error(`Error scraping ${site.name}:`, siteError)
-        continue
-      }
-    }
-
-    // If we didn't get enough courses from scraping, add some fallback data
-    if (courses.length < 3) {
-      console.log(`Adding fallback course data, only found ${courses.length} courses`)
-      courses.push(...getFallbackCourses(query).slice(0, limit - courses.length))
-    }
-
-    console.log(`Successfully scraped ${courses.length} courses for query: ${query}`)
-    return courses.slice(0, limit)
-  } catch (error) {
-    console.error("Error in scrapeCourses:", error)
-    // Return fallback data on error
-    return getFallbackCourses(query).slice(0, limit)
+  // If no jobs found, return sample data
+  if (jobs.length === 0) {
+    console.log("[v0] No jobs scraped, returning sample data")
+    return generateSampleJobs(query, limit)
   }
+
+  return jobs.slice(0, limit)
 }
 
-// Fallback job data when scraping fails
-function getFallbackJobs(query: string): ScrapedJob[] {
-  const fallbackJobs: ScrapedJob[] = [
-    {
-      title: `Senior ${query} Developer`,
-      company: "TechCorp Inc.",
-      location: "San Francisco, CA",
-      description: `We're looking for a senior ${query} developer to join our growing team...`,
-      requirements: ["5+ years experience", `${query} expertise`, "Problem-solving skills", "Team collaboration"],
-      skills: [query.toLowerCase(), "javascript", "react", "node.js", "typescript", "aws"],
-      salaryRange: { min: 120000, max: 160000, currency: "USD" },
-      url: "https://example.com/job/1",
-    },
-    {
-      title: `${query} Engineer`,
-      company: "DataTech Solutions",
-      location: "New York, NY",
-      description: `Join our team to build cutting-edge ${query} solutions...`,
-      requirements: ["3+ years experience", `${query} proficiency`, "Agile methodology", "Communication skills"],
-      skills: [query.toLowerCase(), "python", "sql", "docker", "kubernetes", "git"],
-      salaryRange: { min: 100000, max: 140000, currency: "USD" },
-      url: "https://example.com/job/2",
-    },
-  ]
+export async function batchScrapeJobs(queries: string[], limitPerQuery = 10): Promise<JobListing[]> {
+  console.log(`[v0] Starting batch job scraping for ${queries.length} queries`)
 
-  return fallbackJobs
-}
-
-// Fallback course data when scraping fails
-function getFallbackCourses(query: string): ScrapedCourse[] {
-  const fallbackCourses: ScrapedCourse[] = [
-    {
-      title: `Complete ${query} Bootcamp`,
-      provider: "Udemy",
-      description: `Learn ${query} from scratch with hands-on projects...`,
-      skills: [query.toLowerCase(), "javascript", "html", "css", "react"],
-      level: "beginner",
-      duration: "40 hours",
-      price: 89.99,
-      rating: 4.7,
-      url: "https://udemy.com/course/complete-bootcamp",
-    },
-    {
-      title: `Advanced ${query} Specialization`,
-      provider: "Coursera",
-      description: `Master advanced ${query} concepts and techniques...`,
-      skills: [query.toLowerCase(), "advanced concepts", "best practices", "architecture"],
-      level: "advanced",
-      duration: "3 months",
-      price: 49.99,
-      rating: 4.9,
-      url: "https://coursera.org/specializations/advanced",
-    },
-  ]
-
-  return fallbackCourses
-}
-
-// Batch scrape multiple queries
-export async function batchScrapeJobs(queries: string[], limitPerQuery = 10): Promise<ScrapedJob[]> {
-  const allJobs: ScrapedJob[] = []
+  const allJobs: JobListing[] = []
 
   for (const query of queries) {
     try {
       const jobs = await scrapeJobs(query, limitPerQuery)
       allJobs.push(...jobs)
+      console.log(`[v0] Scraped ${jobs.length} jobs for query: ${query}`)
+
+      // Rate limiting between queries
+      await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
-      console.error(`Error scraping jobs for query "${query}":`, error)
+      console.error(`[v0] Error scraping jobs for query ${query}:`, error)
+      continue
     }
   }
 
-  // Remove duplicates based on URL
-  const uniqueJobs = allJobs.filter((job, index, self) => index === self.findIndex((j) => j.url === job.url))
-
-  return uniqueJobs
+  return allJobs
 }
 
-// Batch scrape multiple course queries
-export async function batchScrapeCourses(queries: string[], limitPerQuery = 8): Promise<ScrapedCourse[]> {
-  const allCourses: ScrapedCourse[] = []
+export async function scrapeCourses(query: string, limit = 20): Promise<CourseListing[]> {
+  console.log(`[v0] Starting course scraping for query: ${query}, limit: ${limit}`)
+
+  if (!process.env.FIRECRAWL_API_KEY) {
+    console.warn("[v0] FIRECRAWL_API_KEY not found, returning sample data")
+    return generateSampleCourses(query, limit)
+  }
+
+  const courses: CourseListing[] = []
+  const sitesToScrape = COURSE_SITES.slice(0, Math.min(2, Math.ceil(limit / 10)))
+
+  for (const site of sitesToScrape) {
+    try {
+      console.log(`[v0] Scraping courses from: ${site}`)
+
+      const result = await firecrawl.scrape(site, {
+        formats: ["markdown", "html"],
+        onlyMainContent: true,
+        timeout: 30000,
+      })
+
+      if (result.success && result.markdown) {
+        const extractedCourses = extractCoursesFromContent(result.markdown, query)
+        courses.push(...extractedCourses.slice(0, Math.floor(limit / sitesToScrape.length)))
+        console.log(`[v0] Extracted ${extractedCourses.length} courses from ${site}`)
+      }
+
+      // Rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    } catch (error) {
+      console.error(`[v0] Error scraping ${site}:`, error)
+      continue
+    }
+  }
+
+  // If no courses found, return sample data
+  if (courses.length === 0) {
+    console.log("[v0] No courses scraped, returning sample data")
+    return generateSampleCourses(query, limit)
+  }
+
+  return courses.slice(0, limit)
+}
+
+export async function batchScrapeCourses(queries: string[], limitPerQuery = 10): Promise<CourseListing[]> {
+  console.log(`[v0] Starting batch course scraping for ${queries.length} queries`)
+
+  const allCourses: CourseListing[] = []
 
   for (const query of queries) {
     try {
       const courses = await scrapeCourses(query, limitPerQuery)
       allCourses.push(...courses)
+      console.log(`[v0] Scraped ${courses.length} courses for query: ${query}`)
+
+      // Rate limiting between queries
+      await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
-      console.error(`Error scraping courses for query "${query}":`, error)
+      console.error(`[v0] Error scraping courses for query ${query}:`, error)
+      continue
     }
   }
 
-  // Remove duplicates based on URL
-  const uniqueCourses = allCourses.filter(
-    (course, index, self) => index === self.findIndex((c) => c.url === course.url),
-  )
+  return allCourses
+}
 
-  return uniqueCourses
+function extractJobsFromContent(content: string, query: string): JobListing[] {
+  const jobs: JobListing[] = []
+
+  // Enhanced regex patterns for job extraction
+  const jobPatterns = [
+    /(?:^|\n)(?:##?\s*)?(.+?(?:developer|engineer|programmer|analyst|designer|manager).*?)(?:\n|$)/gim,
+    /(?:job|position|role):\s*(.+?)(?:\n|$)/gim,
+    /(?:title|position):\s*(.+?)(?:\n|$)/gim,
+  ]
+
+  const companyPatterns = [
+    /(?:company|employer|organization):\s*(.+?)(?:\n|$)/gim,
+    /(?:at|@)\s*([A-Z][a-zA-Z\s&.,-]+?)(?:\s|$)/gim,
+  ]
+
+  const locationPatterns = [/(?:location|based|office):\s*(.+?)(?:\n|$)/gim, /(?:remote|hybrid|on-site)/gim]
+
+  // Extract potential job titles
+  for (const pattern of jobPatterns) {
+    let match
+    while ((match = pattern.exec(content)) !== null && jobs.length < 20) {
+      const title = match[1]?.trim()
+      if (title && title.length > 5 && title.length < 100) {
+        jobs.push({
+          title,
+          company: "Various Companies",
+          location: "Remote/Hybrid",
+          description: `${title} position matching "${query}" requirements`,
+          url: "#",
+          type: "Full-time",
+          remote: true,
+          skills: extractSkillsFromText(title + " " + query),
+        })
+      }
+    }
+  }
+
+  return jobs.slice(0, 10)
+}
+
+function extractCoursesFromContent(content: string, query: string): CourseListing[] {
+  const courses: CourseListing[] = []
+
+  // Enhanced regex patterns for course extraction
+  const coursePatterns = [
+    /(?:course|class|tutorial|training):\s*(.+?)(?:\n|$)/gim,
+    /(?:learn|master|introduction to|complete)\s+(.+?)(?:\n|$)/gim,
+    /(?:^|\n)(?:##?\s*)?(.+?(?:course|tutorial|bootcamp|certification).*?)(?:\n|$)/gim,
+  ]
+
+  // Extract potential course titles
+  for (const pattern of coursePatterns) {
+    let match
+    while ((match = pattern.exec(content)) !== null && courses.length < 20) {
+      const title = match[1]?.trim()
+      if (title && title.length > 5 && title.length < 100) {
+        courses.push({
+          title,
+          provider: "Online Learning Platform",
+          description: `Comprehensive ${title} course covering ${query} fundamentals and advanced concepts`,
+          url: "#",
+          level: "Beginner to Advanced",
+          duration: "4-12 weeks",
+          skills: extractSkillsFromText(title + " " + query),
+        })
+      }
+    }
+  }
+
+  return courses.slice(0, 10)
+}
+
+function extractSkillsFromText(text: string): string[] {
+  const commonSkills = [
+    "JavaScript",
+    "Python",
+    "React",
+    "Node.js",
+    "TypeScript",
+    "SQL",
+    "AWS",
+    "Docker",
+    "Kubernetes",
+    "Git",
+    "HTML",
+    "CSS",
+    "Java",
+    "C++",
+    "Go",
+    "Rust",
+    "MongoDB",
+    "PostgreSQL",
+    "Redis",
+    "GraphQL",
+    "REST API",
+    "Machine Learning",
+    "AI",
+    "DevOps",
+  ]
+
+  const foundSkills = commonSkills.filter((skill) => text.toLowerCase().includes(skill.toLowerCase()))
+
+  return foundSkills.slice(0, 5)
+}
+
+function generateSampleJobs(query: string, limit: number): JobListing[] {
+  const sampleJobs = [
+    {
+      title: `Senior ${query} Developer`,
+      company: "TechCorp Inc.",
+      location: "Remote",
+      description: `We're looking for an experienced ${query} developer to join our growing team.`,
+      url: "#",
+      salary: "$80,000 - $120,000",
+      type: "Full-time",
+      remote: true,
+      skills: extractSkillsFromText(query),
+    },
+    {
+      title: `${query} Engineer`,
+      company: "StartupXYZ",
+      location: "San Francisco, CA",
+      description: `Join our innovative team working on cutting-edge ${query} solutions.`,
+      url: "#",
+      salary: "$90,000 - $140,000",
+      type: "Full-time",
+      remote: false,
+      skills: extractSkillsFromText(query),
+    },
+    {
+      title: `Junior ${query} Developer`,
+      company: "DevAgency",
+      location: "Remote",
+      description: `Entry-level position perfect for someone starting their ${query} career.`,
+      url: "#",
+      salary: "$50,000 - $70,000",
+      type: "Full-time",
+      remote: true,
+      skills: extractSkillsFromText(query),
+    },
+  ]
+
+  return sampleJobs.slice(0, limit)
+}
+
+function generateSampleCourses(query: string, limit: number): CourseListing[] {
+  const sampleCourses = [
+    {
+      title: `Complete ${query} Bootcamp`,
+      provider: "Online Academy",
+      description: `Master ${query} from beginner to advanced level with hands-on projects.`,
+      url: "#",
+      price: "$99",
+      duration: "8 weeks",
+      level: "Beginner",
+      skills: extractSkillsFromText(query),
+    },
+    {
+      title: `Advanced ${query} Techniques`,
+      provider: "Tech University",
+      description: `Deep dive into advanced ${query} concepts and best practices.`,
+      url: "#",
+      price: "$149",
+      duration: "6 weeks",
+      level: "Advanced",
+      skills: extractSkillsFromText(query),
+    },
+    {
+      title: `${query} for Professionals`,
+      provider: "Professional Learning",
+      description: `Industry-focused ${query} course designed for working professionals.`,
+      url: "#",
+      price: "$199",
+      duration: "10 weeks",
+      level: "Intermediate",
+      skills: extractSkillsFromText(query),
+    },
+  ]
+
+  return sampleCourses.slice(0, limit)
 }

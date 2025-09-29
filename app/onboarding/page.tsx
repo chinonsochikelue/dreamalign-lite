@@ -15,6 +15,7 @@ import { Brain, ArrowRight, ArrowLeft, Check, Sparkles, Target, Zap, User, Brief
 import { OnboardingGuard } from "@/components/onboarding-guard"
 import { useUserDetails } from "@/context/UserDetailContext"
 import { useAnalytics } from "@/lib/analytics"
+import { sendCareerRecommendationEmail } from "@/lib/integrations/resend"
 
 const INTEREST_OPTIONS = [
   {
@@ -232,12 +233,43 @@ export default function OnboardingPage() {
           ...formData,
         })
 
-        await generateCareerPaths({ userId: currentUser._id })
+        const careerPathsResult = await generateCareerPaths({ userId: currentUser._id })
 
         analytics.trackOnboardingCompleted(
           Date.now() - onboardingStartTime,
           100, // 100% completion rate
         )
+
+        if (user?.primaryEmailAddress?.emailAddress && user.fullName && careerPathsResult) {
+          try {
+            // Extract career path names from the result
+            const careerPaths = careerPathsResult.map((path: any) => path.title || path.name || path)
+
+            const emailSent = await sendCareerRecommendationEmail(
+              user.primaryEmailAddress.emailAddress,
+              user.fullName,
+              careerPaths,
+            )
+
+            if (emailSent) {
+              console.log("[Onboarding] Career recommendation email sent successfully")
+              analytics.track("career_recommendation_email_sent", {
+                userId: currentUser._id,
+                userEmail: user.primaryEmailAddress.emailAddress,
+                careerPathsCount: careerPaths.length,
+              })
+            } else {
+              console.error("[Onboarding] Failed to send career recommendation email")
+              analytics.track("career_recommendation_email_failed", {
+                userId: currentUser._id,
+                userEmail: user.primaryEmailAddress.emailAddress,
+              })
+            }
+          } catch (emailError) {
+            console.error("[Onboarding] Error sending career recommendation email:", emailError)
+            analytics.trackError(emailError, "career_recommendation_email")
+          }
+        }
 
         setTimeout(() => {
           router.push("/dashboard")

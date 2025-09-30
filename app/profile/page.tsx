@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -96,10 +96,15 @@ export default function ProfilePage() {
   const { user: clerkUser } = useUser()
   const [isEditing, setIsEditing] = useState(false)
   const [activeTab, setActiveTab] = useState("personal")
+  const userCreationAttempted = useRef(false)
 
-  const user = useQuery(api.users.getCurrentUser)
+  const user = useQuery(
+    api.users.getByEmail,
+    clerkUser?.primaryEmailAddress?.emailAddress ? { email: clerkUser.primaryEmailAddress.emailAddress } : "skip",
+  )
   const updateUser = useMutation(api.users.updateUserProfile)
   const updateOnboardingData = useMutation(api.users.updateOnboardingData)
+  const createUser = useMutation(api.users.CreateNewUser)
 
   const analytics = useAnalytics()
 
@@ -129,23 +134,61 @@ export default function ProfilePage() {
   const [showAddSkill, setShowAddSkill] = useState(false)
 
   useEffect(() => {
+    const initializeUser = async () => {
+      if (user === null && clerkUser && !userCreationAttempted.current) {
+        userCreationAttempted.current = true
+        try {
+          await createUser({
+            email: clerkUser.primaryEmailAddress?.emailAddress || "",
+            name: clerkUser.fullName || clerkUser.firstName || "User",
+            imageUrl: clerkUser.imageUrl || "",
+          })
+        } catch (error) {
+          console.error("Error creating user:", error)
+          userCreationAttempted.current = false
+        }
+      }
+    }
+
+    initializeUser()
+  }, [user, clerkUser, createUser])
+
+  useEffect(() => {
     if (user && clerkUser) {
+      // Check if workPreferences is an array or object
+      let workPrefs = {
+        remoteWork: false,
+        teamSize: "",
+        workEnvironment: "",
+        careerGoals: [],
+      }
+
+      if (user.workPreferences) {
+        if (Array.isArray(user.workPreferences)) {
+          // Old format - array of strings
+          workPrefs.careerGoals = user.workPreferences
+        } else {
+          // New format - object
+          workPrefs = {
+            remoteWork: user.workPreferences.remoteWork || false,
+            teamSize: user.workPreferences.teamSize || "",
+            workEnvironment: user.workPreferences.workEnvironment || "",
+            careerGoals: user.workPreferences.careerGoals || [],
+          }
+        }
+      }
+
       setEditedProfile({
         name: clerkUser.fullName || user.name || "",
         email: clerkUser.primaryEmailAddress?.emailAddress || user.email || "",
         location: user.location || "",
         bio: user.bio || "",
         interests: user.interests || [],
-        goals: user.goals || [],
+        goals: user.careerGoals || [], // Map careerGoals from DB to goals in state
         skills: user.skills || [],
         experienceLevel: user.experienceLevel || "",
         personalityTraits: user.personalityTraits || [],
-        workPreferences: {
-          remoteWork: user.workPreferences?.remoteWork || false,
-          teamSize: user.workPreferences?.teamSize || "",
-          workEnvironment: user.workPreferences?.workEnvironment || "",
-          careerGoals: user.workPreferences?.careerGoals || [],
-        },
+        workPreferences: workPrefs,
       })
     }
   }, [user, clerkUser])
@@ -156,7 +199,7 @@ export default function ProfilePage() {
         userId: user._id,
         profileCompleteness: Math.round(
           (((user.interests?.length > 0 ? 1 : 0) +
-            (user.goals?.length > 0 ? 1 : 0) +
+            (user.careerGoals?.length > 0 ? 1 : 0) +
             (user.skills?.length > 0 ? 1 : 0) +
             (user.bio ? 1 : 0) +
             (user.experienceLevel ? 1 : 0)) /
@@ -170,13 +213,12 @@ export default function ProfilePage() {
   const handleSave = async () => {
     const changedFields = []
 
-    // Detect what changed
     if (user) {
       if (editedProfile.name !== (clerkUser?.fullName || user.name)) changedFields.push("name")
       if (editedProfile.location !== user.location) changedFields.push("location")
       if (editedProfile.bio !== user.bio) changedFields.push("bio")
       if (JSON.stringify(editedProfile.interests) !== JSON.stringify(user.interests)) changedFields.push("interests")
-      if (JSON.stringify(editedProfile.goals) !== JSON.stringify(user.goals)) changedFields.push("goals")
+      if (JSON.stringify(editedProfile.goals) !== JSON.stringify(user.careerGoals)) changedFields.push("goals")
       if (JSON.stringify(editedProfile.skills) !== JSON.stringify(user.skills)) changedFields.push("skills")
       if (editedProfile.experienceLevel !== user.experienceLevel) changedFields.push("experienceLevel")
       if (JSON.stringify(editedProfile.personalityTraits) !== JSON.stringify(user.personalityTraits))
@@ -194,7 +236,7 @@ export default function ProfilePage() {
 
       await updateOnboardingData({
         interests: editedProfile.interests,
-        goals: editedProfile.goals,
+        goals: editedProfile.goals, // Will be mapped to careerGoals in the mutation
         skills: editedProfile.skills,
         experienceLevel: editedProfile.experienceLevel,
         personalityTraits: editedProfile.personalityTraits,
@@ -221,22 +263,37 @@ export default function ProfilePage() {
 
   const handleCancel = () => {
     if (user && clerkUser) {
+      let workPrefs = {
+        remoteWork: false,
+        teamSize: "",
+        workEnvironment: "",
+        careerGoals: [],
+      }
+
+      if (user.workPreferences) {
+        if (Array.isArray(user.workPreferences)) {
+          workPrefs.careerGoals = user.workPreferences
+        } else {
+          workPrefs = {
+            remoteWork: user.workPreferences.remoteWork || false,
+            teamSize: user.workPreferences.teamSize || "",
+            workEnvironment: user.workPreferences.workEnvironment || "",
+            careerGoals: user.workPreferences.careerGoals || [],
+          }
+        }
+      }
+
       setEditedProfile({
         name: clerkUser.fullName || user.name || "",
         email: clerkUser.primaryEmailAddress?.emailAddress || user.email || "",
         location: user.location || "",
         bio: user.bio || "",
         interests: user.interests || [],
-        goals: user.goals || [],
+        goals: user.careerGoals || [],
         skills: user.skills || [],
         experienceLevel: user.experienceLevel || "",
         personalityTraits: user.personalityTraits || [],
-        workPreferences: {
-          remoteWork: user.workPreferences?.remoteWork || false,
-          teamSize: user.workPreferences?.teamSize || "",
-          workEnvironment: user.workPreferences?.workEnvironment || "",
-          careerGoals: user.workPreferences?.careerGoals || [],
-        },
+        workPreferences: workPrefs,
       })
     }
     setIsEditing(false)
@@ -340,12 +397,23 @@ export default function ProfilePage() {
     return interest?.icon || Star
   }
 
-  if (!user) {
+  if (user === undefined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-slate-600 dark:text-slate-400">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (user === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Setting up your profile...</p>
         </div>
       </div>
     )

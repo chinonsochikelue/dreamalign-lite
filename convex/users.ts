@@ -185,6 +185,52 @@ export const getProfile = query({
   },
 })
 
+export const ensureUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity?.email) {
+      throw new Error("Not authenticated")
+    }
+
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first()
+
+    if (!user) {
+      const now = Date.now()
+      const userId = await ctx.db.insert("users", {
+        email: identity.email,
+        name: identity.name || "User",
+        imageUrl: identity.pictureUrl || "",
+        interests: [],
+        profileCompleted: false,
+        onboardingStep: 1,
+        skills: [],
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      // Initialize user progress
+      await ctx.db.insert("userProgress", {
+        userId,
+        totalInterviews: 0,
+        averageScore: 0,
+        improvementAreas: [],
+        strengths: [],
+        lastActivityAt: now,
+        streakDays: 0,
+        achievements: [],
+      })
+
+      user = await ctx.db.get(userId)
+    }
+
+    return user
+  },
+})
+
 export const completeOnboarding = mutation({
   args: {
     userId: v.id("users"),

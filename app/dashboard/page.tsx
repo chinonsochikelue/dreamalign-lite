@@ -50,20 +50,12 @@ import {
   Cell,
 } from "recharts"
 import { DashboardNav } from "@/components/dashboard-nav"
+import EmptyVideoInterview from "./emptyVideoInterview"
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
   const analytics = useAnalytics()
-
-  const [userStats, setUserStats] = useState({
-    totalInterviews: 12,
-    averageScore: 7.8,
-    improvementRate: 23,
-    streakDays: 5,
-    careerPathsExplored: 3,
-    hoursSpent: 8.5,
-  })
-
+  const [interviewList, setInterviewList] = useState([])
   const getUserByEmail = useQuery(
     api.users.getByEmail,
     user?.primaryEmailAddress?.emailAddress ? { email: user.primaryEmailAddress.emailAddress } : "skip",
@@ -76,6 +68,16 @@ export default function DashboardPage() {
 
   const getUserProfile = useQuery(api.users.getProfile, getUserByEmail?._id ? { userId: getUserByEmail._id } : "skip")
 
+  const interviewSessions = useQuery(
+    api.interviews.getUserSessions,
+    getUserByEmail?._id ? { userId: getUserByEmail._id } : "skip",
+  )
+
+  const userProgress = useQuery(
+    api.progress.getUserProgress,
+    getUserByEmail?._id ? { userId: getUserByEmail._id } : "skip",
+  )
+
   const [personalizedContent, setPersonalizedContent] = useState({
     recommendedActions: [],
     skillGaps: [],
@@ -87,6 +89,15 @@ export default function DashboardPage() {
   const [scrapedCourses, setScrapedCourses] = useState([])
   const [isScrapingJobs, setIsScrapingJobs] = useState(false)
   const [isScrapingCourses, setIsScrapingCourses] = useState(false)
+
+  const userStats = {
+    totalInterviews: userProgress?.totalInterviews || 0,
+    averageScore: userProgress?.averageScore || 0,
+    improvementRate: 23, // Can be calculated from historical data
+    streakDays: userProgress?.streakDays || 0,
+    careerPathsExplored: getCareerRecommendations?.length || 0,
+    hoursSpent: getUserByEmail?.availabilityHours || 0,
+  }
 
   useEffect(() => {
     if (getUserByEmail && getCareerRecommendations) {
@@ -265,154 +276,120 @@ export default function DashboardPage() {
     }
   }
 
-  const [interviewHistory, setInterviewHistory] = useState([
-    {
-      id: "1",
-      jobRole: "Full Stack Developer",
-      date: "2025-01-20",
-      score: 8.5,
-      duration: "25m",
-      type: "Technical",
-    },
-    {
-      id: "2",
-      jobRole: "AI/ML Engineer",
-      date: "2025-01-18",
-      score: 7.2,
-      duration: "30m",
-      type: "Behavioral",
-    },
-    {
-      id: "3",
-      jobRole: "Product Manager",
-      date: "2025-01-15",
-      score: 6.8,
-      duration: "22m",
-      type: "General",
-    },
-    {
-      id: "4",
-      jobRole: "Full Stack Developer",
-      date: "2025-01-12",
-      score: 7.9,
-      duration: "28m",
-      type: "System Design",
-    },
-    {
-      id: "5",
-      jobRole: "Data Scientist",
-      date: "2025-01-10",
-      score: 7.5,
-      duration: "32m",
-      type: "Technical",
-    },
-  ])
+  const interviewHistory = (interviewSessions || []).map((session) => ({
+    id: session._id,
+    jobRole: session.jobRole,
+    date: new Date(session.createdAt).toISOString().split("T")[0],
+    score: session.overallScore || 0,
+    duration: session.duration ? `${Math.round(session.duration / 60)}m` : "N/A",
+    type: session.sessionType === "voice" ? "Voice" : "Technical",
+  }))
 
-  const [achievements, setAchievements] = useState([
+  const achievements = (userProgress?.achievements || []).map((achievement, index) => ({
+    id: String(index + 1),
+    title: achievement.title,
+    description: achievement.description,
+    icon: achievement.icon,
+    unlockedAt: new Date(achievement.unlockedAt).toISOString().split("T")[0],
+    isUnlocked: true,
+  }))
+
+  // Add default locked achievements if user has fewer than 6
+  const defaultAchievements = [
     {
-      id: "1",
+      id: "default-1",
       title: "First Interview",
-      description: "Completed your first mock interview",
+      description: "Complete your first mock interview",
       icon: "🎯",
-      unlockedAt: "2025-01-10",
-      isUnlocked: true,
+      unlockedAt: "",
+      isUnlocked: false,
     },
     {
-      id: "2",
+      id: "default-2",
       title: "High Scorer",
-      description: "Achieved a score of 8+ in an interview",
+      description: "Achieve a score of 8+ in an interview",
       icon: "⭐",
-      unlockedAt: "2025-01-15",
-      isUnlocked: true,
+      unlockedAt: "",
+      isUnlocked: false,
     },
     {
-      id: "3",
+      id: "default-3",
       title: "Consistent Learner",
-      description: "Completed 5 interviews in a week",
+      description: "Complete 5 interviews in a week",
       icon: "🔥",
-      unlockedAt: "2025-01-20",
-      isUnlocked: true,
+      unlockedAt: "",
+      isUnlocked: false,
     },
     {
-      id: "4",
+      id: "default-4",
       title: "Career Explorer",
-      description: "Explored 3 different career paths",
+      description: "Explore 3 different career paths",
       icon: "🗺️",
-      unlockedAt: "2025-01-22",
-      isUnlocked: true,
+      unlockedAt: "",
+      isUnlocked: false,
     },
     {
-      id: "5",
+      id: "default-5",
       title: "Perfect Score",
-      description: "Achieved a perfect 10/10 in an interview",
+      description: "Achieve a perfect 10/10 in an interview",
       icon: "💎",
       unlockedAt: "",
       isUnlocked: false,
     },
     {
-      id: "6",
+      id: "default-6",
       title: "Marathon Learner",
       description: "Spent 10+ hours practicing this month",
       icon: "🏃",
       unlockedAt: "",
       isUnlocked: false,
     },
-  ])
-
-  const careerPaths = getCareerRecommendations || [
-    {
-      id: "1",
-      title: "Full Stack Developer",
-      matchScore: 95,
-      progress: 75,
-      lastViewed: "2025-01-20",
-    },
-    {
-      id: "2",
-      title: "AI/ML Engineer",
-      matchScore: 92,
-      progress: 45,
-      lastViewed: "2025-01-18",
-    },
-    {
-      id: "3",
-      title: "Product Manager",
-      matchScore: 87,
-      progress: 30,
-      lastViewed: "2025-01-15",
-    },
   ]
 
-  // Enhanced performance data
-  const performanceData = [
-    { date: "Jan 5", score: 5.8 },
-    { date: "Jan 10", score: 6.2 },
-    { date: "Jan 12", score: 7.9 },
-    { date: "Jan 15", score: 6.8 },
-    { date: "Jan 18", score: 7.2 },
-    { date: "Jan 20", score: 8.5 },
-  ]
+  const allAchievements = [...achievements, ...defaultAchievements.slice(achievements.length)]
 
-  const skillsData = getUserByEmail?.skills?.slice(0, 5).map((skill) => ({
-    skill,
-    score: Math.random() * 3 + 7, // Random score between 7-10
-  })) || [
-    { skill: "Communication", score: 8.5 },
-    { skill: "Technical", score: 7.8 },
-    { skill: "Problem Solving", score: 8.2 },
-    { skill: "Leadership", score: 6.9 },
-    { skill: "Creativity", score: 7.5 },
-  ]
+  const careerPaths = getCareerRecommendations || []
 
-  const weeklyActivityData = [
-    { day: "Mon", interviews: 2 },
-    { day: "Tue", interviews: 1 },
-    { day: "Wed", interviews: 3 },
-    { day: "Thu", interviews: 0 },
-    { day: "Fri", interviews: 2 },
-    { day: "Sat", interviews: 1 },
-    { day: "Sun", interviews: 1 },
-  ]
+  const performanceData = interviewHistory
+    .slice(0, 6)
+    .reverse()
+    .map((interview) => ({
+      date: new Date(interview.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      score: interview.score,
+    }))
+
+  const skillsData = (userProgress?.strengths || getUserByEmail?.skills || []).slice(0, 5).map((skill) => ({
+    skill: typeof skill === "string" ? skill : skill.name || "Unknown",
+    score: typeof skill === "object" && skill.score ? skill.score : Math.random() * 3 + 7,
+  }))
+
+  // Add default skills if user has none
+  if (skillsData.length === 0) {
+    skillsData.push(
+      { skill: "Communication", score: 0 },
+      { skill: "Technical", score: 0 },
+      { skill: "Problem Solving", score: 0 },
+    )
+  }
+
+  const weeklyActivityData = (() => {
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    const counts = new Array(7).fill(0)
+
+    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    interviewHistory.forEach((interview) => {
+      const interviewDate = new Date(interview.date)
+      if (interviewDate.getTime() > oneWeekAgo) {
+        const dayIndex = (interviewDate.getDay() + 6) % 7 // Convert Sunday=0 to Monday=0
+        counts[dayIndex]++
+      }
+    })
+
+    return days.map((day, index) => ({
+      day,
+      interviews: counts[index],
+    }))
+  })()
 
   const interestData =
     getUserByEmail?.interests?.map((interest) => ({
@@ -569,7 +546,7 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">{userStats.totalInterviews}</p>
                     <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center mt-1">
                       {getImprovementIcon(5)}
-                      <span className="ml-1">+2 this week</span>
+                      <span className="ml-1">Keep practicing!</span>
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
@@ -585,12 +562,12 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-1">Average Score</p>
                     <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">
-                      {userStats.averageScore}
+                      {userStats.averageScore.toFixed(1)}
                       <span className="text-lg">/10</span>
                     </p>
                     <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center mt-1">
                       {getImprovementIcon(12)}
-                      <span className="ml-1">+0.3 this month</span>
+                      <span className="ml-1">Great progress!</span>
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center">
@@ -606,7 +583,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">Career Match</p>
                     <p className="text-3xl font-bold text-green-900 dark:text-green-100">
-                      {careerPaths[0]?.matchScore || 85}%
+                      {careerPaths[0]?.matchScore || 0}%
                     </p>
                     <p className="text-xs text-green-600 dark:text-green-400 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
@@ -626,7 +603,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">Learning Hours</p>
                     <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">
-                      {getUserByEmail?.availabilityHours || userStats.hoursSpent}
+                      {userStats.hoursSpent}
                       <span className="text-lg">h</span>
                     </p>
                     <p className="text-xs text-orange-600 dark:text-orange-400">Weekly goal</p>
@@ -652,6 +629,12 @@ export default function DashboardPage() {
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
               >
                 For You
+              </TabsTrigger>
+              <TabsTrigger
+                value="videoInterviews"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
+              >
+                Video Interviews
               </TabsTrigger>
               <TabsTrigger
                 value="interviews"
@@ -1246,6 +1229,76 @@ export default function DashboardPage() {
               </div>
             </TabsContent>
 
+            <TabsContent value="videoInterviews" className="space-y-6">
+              {interviewList.length == 0 &&
+              <EmptyVideoInterview />
+              }
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Interview History</h2>
+                  <p className="text-slate-600 dark:text-slate-400 mt-2">
+                    Track your progress and review past interviews
+                  </p>
+                </div>
+                <Button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Interview
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {interviewHistory.map((interview, index) => (
+                  <Card
+                    key={interview.id}
+                    className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                            <MessageSquare className="w-7 h-7 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">
+                              {interview.jobRole}
+                            </h3>
+                            <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
+                              <Badge
+                                variant="outline"
+                                className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                              >
+                                {interview.type}
+                              </Badge>
+                              <span>•</span>
+                              <span>{formatDate(interview.date)}</span>
+                              <span>•</span>
+                              <span>{interview.duration}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <div className={`text-3xl font-bold ${getScoreColor(interview.score)} mb-1`}>
+                              {interview.score}/10
+                            </div>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">Overall Score</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            className="border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent"
+                          >
+                            View Details
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
             <TabsContent value="careers" className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1473,7 +1526,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {achievements.map((achievement, index) => (
+                {allAchievements.map((achievement, index) => (
                   <Card
                     key={achievement.id}
                     className={`border-0 transition-all duration-300 hover:scale-105 ${

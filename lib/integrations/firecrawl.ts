@@ -30,18 +30,14 @@ export interface CourseListing {
 
 // Job scraping sites with better accessibility
 const JOB_SITES = [
-  "https://remoteok.io/remote-dev-jobs",
-  "https://weworkremotely.com/categories/remote-programming-jobs",
-  "https://angel.co/jobs",
-  "https://stackoverflow.com/jobs",
+  "https://remoteok.io/remote-dev-jobs", // Public job board, allows scraping
+  "https://weworkremotely.com/categories/remote-programming-jobs", // Public job board
 ]
 
 // Course scraping sites
 const COURSE_SITES = [
-  "https://www.freecodecamp.org/learn",
-  "https://www.coursera.org/browse/computer-science",
-  "https://www.edx.org/learn/computer-science",
-  "https://www.udemy.com/courses/development/",
+  "https://www.freecodecamp.org/learn", // Open source, public content
+  "https://www.coursera.org/browse/computer-science", // Public course catalog
 ]
 
 export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[]> {
@@ -53,7 +49,7 @@ export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[
   }
 
   const jobs: JobListing[] = []
-  const sitesToScrape = JOB_SITES.slice(0, Math.min(2, Math.ceil(limit / 10)))
+  const sitesToScrape = JOB_SITES.slice(0, 1)
 
   for (const site of sitesToScrape) {
     try {
@@ -71,8 +67,7 @@ export async function scrapeJobs(query: string, limit = 20): Promise<JobListing[
         console.log(`Extracted ${extractedJobs.length} jobs from ${site}`)
       }
 
-      // Rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
       console.error(`Error scraping ${site}:`, error)
       continue
@@ -119,7 +114,7 @@ export async function scrapeCourses(query: string, limit = 20): Promise<CourseLi
   }
 
   const courses: CourseListing[] = []
-  const sitesToScrape = COURSE_SITES.slice(0, Math.min(2, Math.ceil(limit / 10)))
+  const sitesToScrape = COURSE_SITES.slice(0, 1)
 
   for (const site of sitesToScrape) {
     try {
@@ -137,8 +132,7 @@ export async function scrapeCourses(query: string, limit = 20): Promise<CourseLi
         console.log(`Extracted ${extractedCourses.length} courses from ${site}`)
       }
 
-      // Rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
       console.error(`Error scraping ${site}:`, error)
       continue

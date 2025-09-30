@@ -1,14 +1,31 @@
 import { generateText } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-// Configure Google Gemini provider with API key
-const google = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  ? createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
-  : null
+// Helper function to get Google provider (lazy initialization)
+function getGoogleProvider() {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return createGoogleGenerativeAI({ apiKey })
+}
+
+// Helper function to parse AI responses safely
+function parseAIResponse(text: string): any {
+  try {
+    // Remove markdown code blocks if present
+    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim()
+    return JSON.parse(cleaned)
+  } catch (error) {
+    console.error("Failed to parse AI response:", text)
+    throw error
+  }
+}
 
 // Gemini integration using AI SDK
 export async function analyzeCareerInterests(interests: string[]): Promise<any[]> {
   // If no API key is configured, return fallback data
+  const google = getGoogleProvider()
   if (!google) {
     console.warn("Google Gemini API key not configured, using fallback data")
     return getFallbackCareerPaths(interests)
@@ -39,12 +56,12 @@ Return as JSON array with this structure:
 `
 
     const { text } = await generateText({
-      model: google("gemini-1.5-flash"),
+      model: google("gemini-2.5-flash"),
       prompt,
       temperature: 0.7,
     })
 
-    return JSON.parse(text)
+    return parseAIResponse(text)
   } catch (error) {
     console.error("Error analyzing career interests with Gemini:", error)
     return getFallbackCareerPaths(interests)
@@ -52,6 +69,7 @@ Return as JSON array with this structure:
 }
 
 export async function generateInterviewQuestions(jobRole: string, interviewType: string): Promise<string[]> {
+  const google = getGoogleProvider()
   if (!google) {
     console.warn("Google Gemini API key not configured, using fallback questions")
     return getFallbackQuestions(jobRole, interviewType)
@@ -77,12 +95,12 @@ Return as JSON array of strings:
 `
 
     const { text } = await generateText({
-      model: google("gemini-1.5-flash"),
+      model: google("gemini-2.5-flash"),
       prompt,
       temperature: 0.8,
     })
 
-    return JSON.parse(text)
+    return parseAIResponse(text)
   } catch (error) {
     console.error("Error generating interview questions with Gemini:", error)
     return getFallbackQuestions(jobRole, interviewType)
@@ -94,6 +112,7 @@ export async function evaluateInterviewAnswer(
   answer: string,
   jobRole: string,
 ): Promise<{ score: number; feedback: string }> {
+  const google = getGoogleProvider()
   if (!google) {
     console.warn("Google Gemini API key not configured, using fallback evaluation")
     return getFallbackEvaluation(answer)
@@ -127,12 +146,12 @@ Return as JSON:
 `
 
     const { text } = await generateText({
-      model: google("gemini-1.5-flash"),
+      model: google("gemini-2.5-flash"),
       prompt,
-      temperature: 0.3,
+      temperature: 0.5,
     })
 
-    return JSON.parse(text)
+    return parseAIResponse(text)
   } catch (error) {
     console.error("Error evaluating answer with Gemini:", error)
     return getFallbackEvaluation(answer)
@@ -144,30 +163,38 @@ function getFallbackCareerPaths(interests: string[]): any[] {
   return [
     {
       title: "Full Stack Developer",
-      description: "Build end-to-end web applications using modern frameworks and technologies.",
+      description: "Build end-to-end web applications using modern frameworks and technologies. Work with both frontend and backend systems to create seamless user experiences.",
       matchScore: 95,
-      skills: ["JavaScript", "React", "Node.js", "TypeScript", "SQL", "Git"],
-      jobTitles: ["Full Stack Developer", "Software Engineer", "Web Developer"],
+      skills: ["JavaScript", "React", "Node.js", "TypeScript", "SQL", "Git", "REST APIs", "MongoDB"],
+      jobTitles: ["Full Stack Developer", "Software Engineer", "Web Developer", "Application Developer"],
       salaryRange: { min: 75000, max: 130000, currency: "USD" },
     },
     {
       title: "AI/ML Engineer",
-      description: "Design and implement machine learning models and AI systems.",
+      description: "Design and implement machine learning models and AI systems. Work on cutting-edge projects involving natural language processing, computer vision, and predictive analytics.",
       matchScore: 90,
-      skills: ["Python", "TensorFlow", "PyTorch", "Machine Learning", "Deep Learning"],
-      jobTitles: ["AI Engineer", "Machine Learning Engineer", "Data Scientist"],
+      skills: ["Python", "TensorFlow", "PyTorch", "Machine Learning", "Deep Learning", "Data Analysis", "Statistics", "Neural Networks"],
+      jobTitles: ["AI Engineer", "Machine Learning Engineer", "Data Scientist", "ML Research Engineer"],
       salaryRange: { min: 90000, max: 160000, currency: "USD" },
+    },
+    {
+      title: "DevOps Engineer",
+      description: "Manage infrastructure, automate deployment processes, and ensure system reliability. Bridge the gap between development and operations teams.",
+      matchScore: 85,
+      skills: ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux", "Terraform", "Monitoring", "Scripting"],
+      jobTitles: ["DevOps Engineer", "Site Reliability Engineer", "Cloud Engineer", "Infrastructure Engineer"],
+      salaryRange: { min: 80000, max: 140000, currency: "USD" },
     },
   ]
 }
 
 function getFallbackQuestions(jobRole: string, interviewType: string): string[] {
   return [
-    "Tell me about yourself and your background.",
-    "Why are you interested in this role?",
-    "What are your greatest strengths?",
-    "Describe a challenging situation you faced and how you handled it.",
-    "Where do you see yourself in 5 years?",
+    `Tell me about your experience with ${jobRole} and what drew you to this field.`,
+    `Describe a challenging project you worked on and how you approached solving the problem.`,
+    `What are your greatest strengths and how do they apply to this role?`,
+    `How do you stay updated with the latest trends and technologies in your field?`,
+    `Where do you see yourself in 5 years, and how does this role fit into your career goals?`,
   ]
 }
 
@@ -177,6 +204,6 @@ function getFallbackEvaluation(answer: string): { score: number; feedback: strin
   
   return {
     score,
-    feedback: "Good answer with solid content. Consider adding more specific examples to strengthen your response.",
+    feedback: "Good answer with solid content. Consider adding more specific examples from your experience to strengthen your response. Structure your answer using the STAR method (Situation, Task, Action, Result) for better clarity.",
   }
 }

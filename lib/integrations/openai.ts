@@ -2,8 +2,8 @@ import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
 
 // Configure OpenAI provider with API key
-const openai = process.env.OPENAI_API_KEY
-  ? createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const openai = process.env.NEXT_PUBLIC_OPENAI_API_KEY
+  ? createOpenAI({ apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY })
   : null
 
 // Real OpenAI integration using AI SDK

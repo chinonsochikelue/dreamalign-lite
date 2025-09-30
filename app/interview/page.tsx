@@ -85,7 +85,7 @@ export default function InterviewSetupPage() {
   const [difficulty, setDifficulty] = useState("intermediate")
   const [isStarting, setIsStarting] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(() => getUserPreferredProvider())
-  
+
   const router = useRouter()
   const { user } = useUser()
   const createSession = useMutation(api.interviews.createSession)
@@ -103,19 +103,18 @@ export default function InterviewSetupPage() {
       if (!convexUser) {
         // Create user in Convex database if doesn't exist
         convexUser = await createNewUser({
-          email: user.emailAddresses[0]?.emailAddress || '',
-          name: user.fullName || user.firstName || 'Anonymous',
-          imageUrl: user.imageUrl || '',
+          email: user.emailAddresses[0]?.emailAddress || "",
+          name: user.fullName || user.firstName || "Anonymous",
+          imageUrl: user.imageUrl || "",
         })
       }
 
       if (!convexUser) {
-        throw new Error('Failed to create or retrieve user')
+        throw new Error("Failed to create or retrieve user")
       }
 
-      // Generate AI questions based on role, type, and difficulty
-      const questions = await generateInterviewQuestions(jobRole, interviewType, difficulty)
-      
+      const questions = await generateInterviewQuestions(jobRole, interviewType, difficulty, selectedProvider)
+
       // Create session in backend with proper Convex user ID
       const sessionId = await createSession({
         userId: convexUser._id,
@@ -136,8 +135,8 @@ export default function InterviewSetupPage() {
       // Navigate to the interview session
       router.push(`/interview/${sessionId}`)
     } catch (error) {
-      console.error('Failed to start interview:', error)
-      alert('Failed to start interview. Please try again.')
+      console.error("Failed to start interview:", error)
+      alert("Failed to start interview. Please try again.")
     } finally {
       setIsStarting(false)
     }
@@ -285,9 +284,7 @@ export default function InterviewSetupPage() {
                       {sessionType === "text" && <CheckCircle className="w-4 h-4 text-blue-500 ml-auto" />}
                     </div>
                   </div>
-                  <div
-                    className="p-4 rounded-lg border-2 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed"
-                  >
+                  <div className="p-4 rounded-lg border-2 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed">
                     <div className="flex items-center space-x-3">
                       <Mic className="w-5 h-5 text-slate-400" />
                       <div>

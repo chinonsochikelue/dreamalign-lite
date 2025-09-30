@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { Id } from "@/convex/_generated/dataModel"
+import type { Id } from "@/convex/_generated/dataModel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,7 +34,7 @@ import {
   Zap,
 } from "lucide-react"
 import { useAnalytics } from "@/lib/analytics"
-import { type AIProvider, getAIService, getUserPreferredProvider, getProviderConfig } from "@/lib/ai-provider"
+import { type AIProvider, getUserPreferredProvider, getProviderConfig } from "@/lib/ai-provider"
 import { evaluateAnswer } from "@/lib/ai-interview"
 
 interface Question {
@@ -67,12 +67,12 @@ export default function EnhancedOriginalInterviewSessionPage() {
   const router = useRouter()
   const { user } = useUser()
   const sessionId = params.sessionId as Id<"interviewSessions">
-  
+
   // Backend queries and mutations
   const sessionData = useQuery(api.interviews.getSession, { sessionId })
   const submitAnswer = useMutation(api.interviews.submitAnswer)
   const completeSession = useMutation(api.interviews.completeSession)
-  
+
   // Local state
   const [session, setSession] = useState<InterviewSession | null>(null)
   const [sessionConfig, setSessionConfig] = useState<any>(null)
@@ -96,28 +96,30 @@ export default function EnhancedOriginalInterviewSessionPage() {
       // Still loading, do nothing
       return
     }
-    
+
     // Handle missing or unauthorized session
     if (sessionData === null) {
-      console.error('Session not found or unauthorized')
+      console.error("Session not found or unauthorized")
       setIsLoading(false)
       // Could redirect to interview page or show error
-      router.push('/interview')
+      router.push("/interview")
       return
     }
-    
+
     // Load additional config from localStorage
     const configKey = `interview_config_${sessionId}`
     const savedConfig = localStorage.getItem(configKey)
-    const config = savedConfig ? JSON.parse(savedConfig) : {
-      interviewType: 'general',
-      difficulty: 'intermediate',
-      aiProvider: getUserPreferredProvider(),
-      startTime: sessionData.createdAt,
-    }
-    
+    const config = savedConfig
+      ? JSON.parse(savedConfig)
+      : {
+          interviewType: "general",
+          difficulty: "intermediate",
+          aiProvider: getUserPreferredProvider(),
+          startTime: sessionData.createdAt,
+        }
+
     setSessionConfig(config)
-    
+
     // Convert backend data to frontend format
     const questions: Question[] = sessionData.questions.map((q: any, index: number) => ({
       id: index + 1,
@@ -126,16 +128,21 @@ export default function EnhancedOriginalInterviewSessionPage() {
       feedback: q.feedback,
       score: q.score,
       isAnswered: !!q.answer,
-      difficulty: config.difficulty === 'beginner' ? 'Easy' : config.difficulty === 'advanced' ? 'Hard' : 'Medium',
-      category: config.interviewType === 'behavioral' ? 'Behavioral' : 
-                config.interviewType === 'technical' ? 'Technical' : 
-                config.interviewType === 'system-design' ? 'System Design' : 'General',
+      difficulty: config.difficulty === "beginner" ? "Easy" : config.difficulty === "advanced" ? "Hard" : "Medium",
+      category:
+        config.interviewType === "behavioral"
+          ? "Behavioral"
+          : config.interviewType === "technical"
+            ? "Technical"
+            : config.interviewType === "system-design"
+              ? "System Design"
+              : "General",
       timeSpent: q.timeSpent,
     }))
-    
+
     // Find current question index
-    const currentIndex = questions.findIndex(q => !q.isAnswered)
-    
+    const currentIndex = questions.findIndex((q) => !q.isAnswered)
+
     setSession({
       jobRole: sessionData.jobRole,
       interviewType: config.interviewType,
@@ -145,10 +152,10 @@ export default function EnhancedOriginalInterviewSessionPage() {
       startTime: config.startTime,
       questions,
       currentQuestionIndex: currentIndex === -1 ? questions.length - 1 : currentIndex,
-      isCompleted: sessionData.status === 'completed',
+      isCompleted: sessionData.status === "completed",
       isPaused: false,
     })
-    
+
     setIsLoading(false)
   }, [sessionData, sessionId])
 
@@ -179,10 +186,10 @@ export default function EnhancedOriginalInterviewSessionPage() {
   }, [session])
 
   useEffect(() => {
-    if (session) {
+    if (session && !isSubmitting) {
       setQuestionStartTime(Date.now())
     }
-  }, [session?.currentQuestionIndex])
+  }, [session])
 
   const handleSubmitAnswer = async () => {
     if (!currentAnswer.trim() || !session) return
@@ -191,18 +198,14 @@ export default function EnhancedOriginalInterviewSessionPage() {
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000)
     const currentQuestion = session.questions[session.currentQuestionIndex]
 
-    analytics.trackQuestionAnswered(
-      session.currentQuestionIndex,
-      currentQuestion.category || "general",
-      timeSpent,
-    )
+    analytics.trackQuestionAnswered(session.currentQuestionIndex, currentQuestion.category || "general", timeSpent)
 
     try {
-      // Use the mock AI evaluation for now
       const evaluation = await evaluateAnswer(
         currentQuestion.question,
         currentAnswer,
         session.jobRole,
+        session.aiProvider || "openai",
       )
 
       // Submit to backend
@@ -221,7 +224,6 @@ export default function EnhancedOriginalInterviewSessionPage() {
         evaluation.score,
       )
 
-      // Update local state
       const updatedQuestions = [...session.questions]
       updatedQuestions[session.currentQuestionIndex] = {
         ...currentQuestion,
@@ -232,47 +234,18 @@ export default function EnhancedOriginalInterviewSessionPage() {
         timeSpent,
       }
 
-      const updatedSession = {
+      setSession({
         ...session,
         questions: updatedQuestions,
-      }
+      })
 
-      setSession(updatedSession)
       setCurrentAnswer("")
       setSavedDraft("")
-      setIsSubmitting(false)
       setShowHints(false)
-
-      // Auto-advance after showing feedback
-      setTimeout(async () => {
-        if (session.currentQuestionIndex < session.questions.length - 1) {
-          setSession((prev) => ({
-            ...prev!,
-            currentQuestionIndex: prev!.currentQuestionIndex + 1,
-          }))
-          setQuestionStartTime(Date.now())
-        } else {
-          // Interview completed - submit to backend
-          const averageScore =
-            updatedQuestions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
-            updatedQuestions.length
-
-          await completeSession({
-            sessionId,
-            overallScore: averageScore,
-            overallFeedback: 'Interview completed successfully',
-            duration: Math.floor((Date.now() - session.startTime) / 1000),
-          })
-
-          analytics.trackInterviewCompleted(updatedQuestions.length, averageScore, timeElapsed)
-
-          // Navigate to results page
-          router.push(`/interview/${sessionId}/results`)
-        }
-      }, 4000)
+      setIsSubmitting(false)
     } catch (error) {
-      console.error('Error submitting answer:', error)
-      
+      console.error("[v0] Error submitting answer:", error)
+
       // Fallback to mock evaluation
       const mockScore = Math.floor(Math.random() * 3) + 7
       const mockFeedback = generateMockFeedback(currentAnswer, currentQuestion.category)
@@ -286,7 +259,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
           score: mockScore,
         })
       } catch (backendError) {
-        console.error('Backend submission failed:', backendError)
+        console.error("[v0] Backend submission failed:", backendError)
       }
 
       // Update local state with fallback
@@ -307,41 +280,59 @@ export default function EnhancedOriginalInterviewSessionPage() {
     }
   }
 
-  const generateMockFeedback = (answer: string, category?: string) => {
-    const feedbackOptions = {
-      Behavioral: [
-        "Good use of specific examples. Consider structuring your response using the STAR method for even stronger impact.",
-        "Your answer shows good self-awareness. Adding more quantifiable results would strengthen your response.",
-        "Nice personal touch in your answer. Consider expanding on the skills you demonstrated in this situation.",
-      ],
-      Technical: [
-        "Solid technical knowledge demonstrated. Consider discussing trade-offs between different approaches.",
-        "Good explanation of concepts. Adding real-world examples of implementation would enhance your answer.",
-        "Shows understanding of the fundamentals. Discussing recent trends or updates would show continued learning.",
-      ],
-      "Career Goals": [
-        "Clear vision for your future. Consider connecting your goals more directly to this specific role.",
-        "Good forward-thinking approach. Adding specific steps you're taking to achieve these goals would strengthen your answer.",
-        "Realistic and thoughtful goals. Consider mentioning how this role fits into your broader career strategy.",
-      ],
-    }
+  const handleNextQuestion = async () => {
+    if (!session) return
 
-    const categoryFeedback = feedbackOptions[category as keyof typeof feedbackOptions] || feedbackOptions.Behavioral
-    return categoryFeedback[Math.floor(Math.random() * categoryFeedback.length)]
+    if (session.currentQuestionIndex < session.questions.length - 1) {
+      // Move to next question
+      setSession({
+        ...session,
+        currentQuestionIndex: session.currentQuestionIndex + 1,
+      })
+      setCurrentAnswer("")
+      setSavedDraft("")
+    } else {
+      // Interview completed - submit to backend
+      const completedQuestions = session.questions.filter((q) => q.isAnswered)
+      const averageScore =
+        completedQuestions.length > 0
+          ? completedQuestions.reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions.length
+          : 0
+
+      try {
+        await completeSession({
+          sessionId,
+          overallScore: averageScore,
+          overallFeedback: "Interview completed successfully",
+          duration: Math.floor((Date.now() - session.startTime) / 1000),
+        })
+
+        analytics.trackInterviewCompleted(completedQuestions.length, averageScore, timeElapsed)
+
+        // Navigate to results page
+        router.push(`/interview/${sessionId}/results`)
+      } catch (error) {
+        console.error("[v0] Error completing session:", error)
+        // Still navigate to results even if backend fails
+        router.push(`/interview/${sessionId}/results`)
+      }
+    }
   }
 
   const handlePauseResume = () => {
-    setSession((prev) => ({ ...prev, isPaused: !prev.isPaused }))
+    setSession((prev) => (prev ? { ...prev, isPaused: !prev.isPaused } : null))
   }
 
   const handleSkipQuestion = () => {
+    if (!session) return
+
     if (session.currentQuestionIndex < session.questions.length - 1) {
-      setSession((prev) => ({
-        ...prev,
-        currentQuestionIndex: prev.currentQuestionIndex + 1,
-      }))
+      setSession({
+        ...session,
+        currentQuestionIndex: session.currentQuestionIndex + 1,
+      })
       setCurrentAnswer("")
-      setQuestionStartTime(Date.now())
+      setSavedDraft("")
     }
   }
 
@@ -385,6 +376,29 @@ export default function EnhancedOriginalInterviewSessionPage() {
     }
   }
 
+  const generateMockFeedback = (answer: string, category?: string) => {
+    const feedbackOptions = {
+      Behavioral: [
+        "Good use of specific examples. Consider structuring your response using the STAR method for even stronger impact.",
+        "Your answer shows good self-awareness. Adding more quantifiable results would strengthen your response.",
+        "Nice personal touch in your answer. Consider expanding on the skills you demonstrated in this situation.",
+      ],
+      Technical: [
+        "Solid technical knowledge demonstrated. Consider discussing trade-offs between different approaches.",
+        "Good explanation of concepts. Adding real-world examples of implementation would enhance your answer.",
+        "Shows understanding of the fundamentals. Discussing recent trends or updates would show continued learning.",
+      ],
+      "Career Goals": [
+        "Clear vision for your future. Consider connecting your goals more directly to this specific role.",
+        "Good forward-thinking approach. Adding specific steps you're taking to achieve these goals would strengthen your answer.",
+        "Realistic and thoughtful goals. Consider mentioning how this role fits into your broader career strategy.",
+      ],
+    }
+
+    const categoryFeedback = feedbackOptions[category as keyof typeof feedbackOptions] || feedbackOptions.Behavioral
+    return categoryFeedback[Math.floor(Math.random() * categoryFeedback.length)]
+  }
+
   // Handle loading and error states
   if (isLoading) {
     return (
@@ -397,15 +411,15 @@ export default function EnhancedOriginalInterviewSessionPage() {
       </div>
     )
   }
-  
+
   if (!session) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <h3 className="text-xl font-semibold text-slate-900">Session Not Found</h3>
           <p className="text-slate-600">The interview session could not be loaded.</p>
-          <button 
-            onClick={() => router.push('/interview')}
+          <button
+            onClick={() => router.push("/interview")}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Start New Interview
@@ -420,7 +434,6 @@ export default function EnhancedOriginalInterviewSessionPage() {
     ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
   const completedQuestions = session.questions.filter((q) => q.isAnswered).length
   const providerConfig = getProviderConfig(session.aiProvider || "openai")
-
 
   if (session.isCompleted) {
     const averageScore =
@@ -799,14 +812,25 @@ export default function EnhancedOriginalInterviewSessionPage() {
                     </div>
                   </div>
 
-                  {session.currentQuestionIndex < session.questions.length - 1 && (
-                    <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center justify-center space-x-2 text-blue-700">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm font-medium">Preparing next question...</span>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={handleNextQuestion}
+                      size="lg"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
+                    >
+                      {session.currentQuestionIndex < session.questions.length - 1 ? (
+                        <>
+                          Next Question
+                          <ArrowRight className="ml-2 w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          Complete Interview
+                          <CheckCircle className="ml-2 w-4 h-4" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}

@@ -36,6 +36,7 @@ import {
 import { useAnalytics } from "@/lib/analytics"
 import { type AIProvider, getAIService, getUserPreferredProvider, getProviderConfig } from "@/lib/ai-provider"
 import { evaluateAnswer } from "@/lib/ai-interview"
+import Link from "next/link"
 
 interface Question {
   id: number
@@ -429,9 +430,9 @@ export default function EnhancedOriginalInterviewSessionPage() {
         : 0
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-900 flex items-center justify-center">
         <div className="max-w-2xl mx-auto px-4">
-          <Card className="bg-white shadow-2xl border-slate-200/50">
+          <Card className=" bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-900 shadow-2xl border-slate-200/50">
             <CardContent className="pt-12 pb-12 text-center">
               <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-8">
                 <CheckCircle className="w-10 h-10 text-white" />
@@ -469,15 +470,17 @@ export default function EnhancedOriginalInterviewSessionPage() {
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
-                  onClick={() => router.push(`/interview/${sessionId}/results`)}
+                  onClick={() => router.push('/interview/detailed-results')}
                 >
                   View Detailed Results
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
+                <Link href="/interview">
                 <Button size="lg" variant="outline" className="px-8 bg-transparent">
                   Practice Again
                   <RotateCcw className="ml-2 w-4 h-4" />
                 </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -487,7 +490,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-900">
       {/* Enhanced Header */}
       <div className="bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-200/50 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

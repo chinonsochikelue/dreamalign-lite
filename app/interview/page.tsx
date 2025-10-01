@@ -85,12 +85,30 @@ export default function InterviewSetupPage() {
   const [difficulty, setDifficulty] = useState("intermediate")
   const [isStarting, setIsStarting] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(() => getUserPreferredProvider())
+  const [customJobRole, setCustomJobRole] = useState("")
+  const [customInterviewType, setCustomInterviewType] = useState("")
+  const [customJobRoles, setCustomJobRoles] = useState<string[]>([])
+  const [customInterviewTypes, setCustomInterviewTypes] = useState<string[]>([])
 
   const router = useRouter()
   const { user } = useUser()
   const createSession = useMutation(api.interviews.createSession)
   const createNewUser = useMutation(api.users.CreateNewUser)
   const currentUser = useQuery(api.users.getCurrentUser)
+
+  const handleAddCustomJobRole = () => {
+    if (customJobRole.trim() && !customJobRoles.includes(customJobRole.trim())) {
+      setCustomJobRoles((prev) => [...prev, customJobRole.trim()])
+      setCustomJobRole("")
+    }
+  }
+
+  const handleAddCustomInterviewType = () => {
+    if (customInterviewType.trim() && !customInterviewTypes.includes(customInterviewType.trim())) {
+      setCustomInterviewTypes((prev) => [...prev, customInterviewType.trim()])
+      setCustomInterviewType("")
+    }
+  }
 
   const handleStartInterview = async () => {
     if (!jobRole || !interviewType || !user) return
@@ -180,7 +198,7 @@ export default function InterviewSetupPage() {
                 <CardDescription className="text-base">Select the position you're preparing for</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   {JOB_ROLES.map((role) => {
                     const Icon = role.icon
                     return (
@@ -201,6 +219,32 @@ export default function InterviewSetupPage() {
                       </div>
                     )
                   })}
+                  {customJobRoles.map((role) => (
+                    <div
+                      key={role}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
+                        jobRole === role
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300 hover:shadow-md"
+                      }`}
+                      onClick={() => setJobRole(role)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{role}</span>
+                        {jobRole === role && <CheckCircle className="w-5 h-5 text-blue-500 ml-auto" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={customJobRole}
+                    onChange={(e) => setCustomJobRole(e.target.value)}
+                    placeholder="Add custom job role..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                  <Button variant="outline" onClick={handleAddCustomJobRole}>Add</Button>
                 </div>
               </CardContent>
             </Card>
@@ -216,7 +260,7 @@ export default function InterviewSetupPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   {INTERVIEW_TYPES.map((type) => {
                     const Icon = type.icon
                     return (
@@ -242,6 +286,35 @@ export default function InterviewSetupPage() {
                       </div>
                     )
                   })}
+                  {customInterviewTypes.map((type) => (
+                    <div
+                      key={type}
+                      className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
+                        interviewType === type
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md"
+                      }`}
+                      onClick={() => setInterviewType(type)}
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="w-6 h-6 flex-shrink-0 mt-1" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">{type}</h4>
+                        </div>
+                        {interviewType === type && <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={customInterviewType}
+                    onChange={(e) => setCustomInterviewType(e.target.value)}
+                    placeholder="Add custom interview type..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                  <Button variant="outline" onClick={handleAddCustomInterviewType}>Add</Button>
                 </div>
               </CardContent>
             </Card>

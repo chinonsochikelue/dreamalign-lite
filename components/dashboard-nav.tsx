@@ -58,7 +58,7 @@ export function DashboardNav() {
       >
         <div
           className={`transition-all duration-500 border-b ease-out ${
-            scrollY > 50
+            isScrolled
               ? "max-w-[95%] mx-auto mt-4 rounded-2xl px-2 md:px-8 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
               : "w-full px-4 bg-white/10 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
           }`}
@@ -162,7 +162,7 @@ export function DashboardNav() {
       >
         <div
           className={`transition-all duration-500 border-b ease-out ${
-            scrollY > 50
+            isScrolled
               ? "max-w-[95%] mx-auto mt-4 rounded-2xl px-2 md:px-8 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
               : "w-full px-4 bg-transparent"
           }`}

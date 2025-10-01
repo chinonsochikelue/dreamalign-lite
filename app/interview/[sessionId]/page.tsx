@@ -112,11 +112,11 @@ export default function EnhancedOriginalInterviewSessionPage() {
     const config = savedConfig
       ? JSON.parse(savedConfig)
       : {
-          interviewType: "general",
-          difficulty: "intermediate",
-          aiProvider: getUserPreferredProvider(),
-          startTime: sessionData.createdAt,
-        }
+        interviewType: "general",
+        difficulty: "intermediate",
+        aiProvider: getUserPreferredProvider(),
+        startTime: sessionData.createdAt,
+      }
 
     setSessionConfig(config)
 
@@ -432,75 +432,99 @@ export default function EnhancedOriginalInterviewSessionPage() {
   const currentQuestion = session.questions[session.currentQuestionIndex]
   const progress =
     ((session.currentQuestionIndex + (currentQuestion?.isAnswered ? 1 : 0)) / session.questions.length) * 100
+
   const completedQuestions = session.questions.filter((q) => q.isAnswered).length
   const providerConfig = getProviderConfig(session.aiProvider || "openai")
+  // Calculate average score for answered questions
+  const answeredScores = session.questions.filter(q => q.isAnswered && typeof q.score === 'number').map(q => q.score as number)
+  const averageScore = answeredScores.length > 0 ? answeredScores.reduce((sum, s) => sum + s, 0) / answeredScores.length : 0
 
-  if (session.isCompleted) {
-    const averageScore =
-      completedQuestions > 0
-        ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) / completedQuestions
-        : 0
+  {
+    session.isCompleted ? (
+  <Card className="border-0 shadow-xl bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/30 dark:to-teal-900/30">
+        <CardHeader>
+          <CardTitle className="flex items-center text-lg">
+            <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+            Interview Completed
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-xl font-semibold text-green-700 mb-2">Congratulations!</h3>
+            <p className="text-slate-700 mb-4">You've completed your interview session.</p>
+          </div>
+          <div className="grid gap-4">
+            <div className="bg-white dark:bg-slate-900 border border-green-200 dark:border-green-700 rounded-xl p-6">
+              <h4 className="font-semibold text-green-700 mb-2">Overall Feedback</h4>
+              <p className="text-green-800 leading-relaxed">{sessionData?.overallFeedback || "Great job!"}</p>
+            </div>
 
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="max-w-2xl mx-auto px-4">
-          <Card className="bg-white shadow-2xl border-slate-200/50">
-            <CardContent className="pt-12 pb-12 text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-8">
-                <CheckCircle className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-4xl font-bold text-slate-900 mb-4">Interview Completed!</h2>
-              <p className="text-xl text-slate-600 mb-8 max-w-lg mx-auto">
-                Congratulations! You've successfully completed your {session.jobRole} interview session.
-              </p>
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-3 gap-6 mb-8 max-w-md mx-auto">
-                <div className="text-center p-4 bg-slate-50 rounded-xl">
-                  <div className="text-2xl font-bold text-slate-900 mb-1">{completedQuestions}</div>
-                  <p className="text-sm text-slate-600">Questions</p>
-                </div>
-                <div className="text-center p-4 bg-slate-50 rounded-xl">
-                  <div className="text-2xl font-bold text-slate-900 mb-1">{formatTime(timeElapsed)}</div>
-                  <p className="text-sm text-slate-600">Duration</p>
-                </div>
-                <div className="text-center p-4 bg-slate-50 rounded-xl">
-                  <div className={`text-2xl font-bold mb-1 ${getScoreColor(averageScore)}`}>
-                    {averageScore.toFixed(1)}
+            <div className="bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-700 rounded-xl p-6">
+              <h4 className="font-semibold text-blue-700 mb-4">Question Feedbacks</h4>
+              <div className="space-y-4">
+                {session.questions.filter(q => q.isAnswered).map((q, idx) => (
+                  <div key={q.id} className="border-b pb-4 last:border-b-0">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Q{idx + 1}: {q.question}</div>
+                    <div className="text-slate-700 dark:text-slate-300 mb-1"><span className="font-medium">Your Answer:</span> {q.answer}</div>
+                    <div className="text-blue-700 dark:text-blue-400"><span className="font-medium">Feedback:</span> {q.feedback || "No feedback available."}</div>
+                    {q.score !== undefined && (
+                      <div className="text-green-700 dark:text-green-400 mt-1"><span className="font-medium">Score:</span> {q.score}/10</div>
+                    )}
                   </div>
-                  <p className="text-sm text-slate-600">Avg Score</p>
-                </div>
+                ))}
               </div>
-
-              <div className="mb-8">
-                <Badge variant="outline" className="px-3 py-1">
-                  Powered by {providerConfig.name} {providerConfig.icon}
-                </Badge>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
-                  onClick={() => router.push(`/interview/${sessionId}/results`)}
-                >
-                  View Detailed Results
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-                <Button size="lg" variant="outline" className="px-8 bg-transparent">
-                  Practice Again
-                  <RotateCcw className="ml-2 w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ) : (
+    <Card className="border-0 shadow-xl bg-white">
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className="text-2xl font-bold text-slate-900 mb-1">{completedQuestions}</div>
+            <p className="text-sm text-slate-600">Questions</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className="text-2xl font-bold text-slate-900 mb-1">{formatTime(timeElapsed)}</div>
+            <p className="text-sm text-slate-600">Duration</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className={`text-2xl font-bold mb-1 ${getScoreColor(averageScore)}`}>
+              {averageScore.toFixed(1)}
+            </div>
+            <p className="text-sm text-slate-600">Avg Score</p>
+          </div>
         </div>
-      </div>
-    )
+
+        <div className="mb-8 text-center">
+          <Badge variant="outline" className="px-3 py-1">
+            Powered by {providerConfig.name} {providerConfig.icon}
+          </Badge>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Button
+            size="lg"
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
+            onClick={() => router.push(`/interview/${sessionId}/results`)}
+          >
+            View Detailed Results
+            <ArrowRight className="ml-2 w-5 h-5" />
+          </Button>
+          <Button size="lg" variant="outline" className="px-8 bg-transparent">
+            Practice Again
+            <RotateCcw className="ml-2 w-4 h-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
   }
 
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen">
       {/* Enhanced Header */}
       <div className="bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-200/50 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -668,11 +692,10 @@ export default function EnhancedOriginalInterviewSessionPage() {
                   {session.sessionType === "voice" ? (
                     <div className="text-center py-16">
                       <div
-                        className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
-                          isRecording
+                        className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${isRecording
                             ? "bg-red-100 border-4 border-red-300 animate-pulse shadow-lg"
                             : "bg-slate-100 border-4 border-slate-300 hover:bg-slate-200"
-                        }`}
+                          }`}
                       >
                         <Mic className={`w-8 h-8 ${isRecording ? "text-red-600" : "text-slate-600"}`} />
                       </div>
@@ -851,13 +874,12 @@ export default function EnhancedOriginalInterviewSessionPage() {
                   {session.questions.map((q, index) => (
                     <div
                       key={q.id}
-                      className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${
-                        index === session.currentQuestionIndex
+                      className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${index === session.currentQuestionIndex
                           ? "bg-blue-50 border-blue-300"
                           : q.isAnswered
                             ? "bg-green-50 border-green-200"
                             : "bg-slate-50 border-slate-200"
-                      }`}
+                        }`}
                       onClick={() => {
                         if (q.isAnswered || index === session.currentQuestionIndex) {
                           setSession((prev) => ({ ...prev, currentQuestionIndex: index }))
@@ -908,15 +930,15 @@ export default function EnhancedOriginalInterviewSessionPage() {
                     className={`font-medium ${getScoreColor(
                       completedQuestions > 0
                         ? session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
-                            completedQuestions
+                        completedQuestions
                         : 0,
                     )}`}
                   >
                     {completedQuestions > 0
                       ? (
-                          session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
-                          completedQuestions
-                        ).toFixed(1)
+                        session.questions.filter((q) => q.score).reduce((sum, q) => sum + (q.score || 0), 0) /
+                        completedQuestions
+                      ).toFixed(1)
                       : "N/A"}
                   </span>
                 </div>

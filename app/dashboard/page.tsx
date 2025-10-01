@@ -51,6 +51,7 @@ import {
 } from "recharts"
 import { DashboardNav } from "@/components/dashboard-nav"
 import { AIChatCard } from "@/components/ui/ai-chat-card"
+import Router from "next/router"
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
@@ -435,6 +436,7 @@ export default function DashboardPage() {
       source: "dashboard_quick_action",
       user_id: user?.id,
     })
+    window.location.href = "/interview"
   }
 
   const handleExploreCareers = () => {
@@ -442,6 +444,7 @@ export default function DashboardPage() {
       source: "dashboard_quick_action",
       user_id: user?.id,
     })
+    window.location.href = "/career-paths"
   }
 
   const handleRecommendedAction = (action) => {

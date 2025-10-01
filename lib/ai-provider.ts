@@ -15,7 +15,7 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
   {
     id: "openai",
     name: "OpenAI GPT-4",
-    description: "Advanced reasoning and comprehensive responses",
+    description: "Advanced reasoning and comprehensive responses, Sadly not free. I don't have the funds to get a working api. Not working, missing API key",
     model: "openai/gpt-4o-mini",
     icon: "🤖",
   },

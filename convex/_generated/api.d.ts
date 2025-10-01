@@ -19,6 +19,7 @@ import type * as interviews from "../interviews.js";
 import type * as progress from "../progress.js";
 import type * as scraping from "../scraping.js";
 import type * as users from "../users.js";
+import type * as videoInterviews from "../videoInterviews.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   progress: typeof progress;
   scraping: typeof scraping;
   users: typeof users;
+  videoInterviews: typeof videoInterviews;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

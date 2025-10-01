@@ -85,3 +85,19 @@ export function setUserPreferredProvider(provider: AIProvider): void {
     console.warn("Failed to save AI provider preference:", error)
   }
 }
+
+// Provider-agnostic interface
+export interface AIService {
+  analyzeCareerInterests(interests: string[]): Promise<any[]>
+  generateInterviewQuestions(jobRole: string, interviewType: string): Promise<string[]>
+  evaluateInterviewAnswer(
+    question: string,
+    answer: string,
+    jobRole: string,
+  ): Promise<{ score: number; feedback: string }>
+  chatWithContext(
+    message: string,
+    systemContext: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+  ): Promise<{ message: string; inputTokens?: number; outputTokens?: number }>
+}

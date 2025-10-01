@@ -25,8 +25,11 @@ import {
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useUser } from "@clerk/nextjs"
+import { DashboardNav } from "@/components/dashboard-nav"
 
 export default function Home() {
+  const { user } = useUser()
   const [scrollY, setScrollY] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
   const [activeFeature, setActiveFeature] = useState<string | null>(null)
@@ -165,14 +168,15 @@ export default function Home() {
         <div className="absolute top-40 right-32 w-3 h-3 bg-blue-400/40 rounded-full animate-ping delay-700"></div>
         <div className="absolute bottom-32 left-1/4 w-2 h-2 bg-pink-400/40 rounded-full animate-ping delay-1000"></div>
       </div>
-
+      {user ? (
+        <DashboardNav />
+      ) : (
       <nav className="fixed w-full z-50">
         <div
-          className={`transition-all duration-500 border-b ease-out ${
-            scrollY > 50
+          className={`transition-all duration-500 border-b ease-out ${scrollY > 50
               ? "max-w-[95%] mx-auto mt-4 rounded-2xl px-2 md:px-8 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-slate-700/50 shadow-2xl shadow-purple-500/10"
               : "w-full px-4 bg-transparent"
-          }`}
+            }`}
         >
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
@@ -214,6 +218,7 @@ export default function Home() {
           </div>
         </div>
       </nav>
+)}
 
       <main className="pt-24">
         {/* Hero Section */}
@@ -325,9 +330,8 @@ export default function Home() {
               {features.map((feature, index) => (
                 <Card
                   key={index}
-                  className={`group border-0 bg-white/80 dark:bg-slate-800/60 backdrop-blur-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 cursor-pointer overflow-hidden relative ${
-                    activeFeature === index ? "ring-2 ring-purple-500 bg-white dark:bg-slate-800" : ""
-                  }`}
+                  className={`group border-0 bg-white/80 dark:bg-slate-800/60 backdrop-blur-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 cursor-pointer overflow-hidden relative ${activeFeature === index ? "ring-2 ring-purple-500 bg-white dark:bg-slate-800" : ""
+                    }`}
                   onMouseEnter={() => setActiveFeature(index)}
                 >
                   <CardHeader className="relative p-8">
@@ -383,7 +387,7 @@ export default function Home() {
                   key={index}
                   className="p-6 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl rounded-2xl border border-white/20 dark:border-slate-700/50 shadow-lg flex flex-col"
                 >
-                  <p className="text-slate-600 dark:text-slate-400 flex-grow">"{testimonial.quote}"</p>
+                  <p className="text-slate-600 dark:text-slate-400 flex-grow italic">"{testimonial.quote}"</p>
                   <div className="mt-4 flex items-center">
                     <img
                       src={testimonial.avatar || "/placeholder.svg"}

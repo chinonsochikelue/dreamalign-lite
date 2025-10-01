@@ -32,7 +32,11 @@ export default function CareerPathsPage() {
   const { user: clerkUser } = useUser()
   const convexUser = useQuery(api.users.getCurrentUser)
 
-  const careerPaths = useQuery(api.careerPaths.getUserPaths, convexUser?._id ? { userId: convexUser._id } : null)
+  // Fix: Use "skip" string instead of null when convexUser is not available
+  const careerPaths = useQuery(
+    api.careerPaths.getUserPaths,
+    convexUser?._id ? { userId: convexUser._id } : "skip"
+  )
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("matchScore")

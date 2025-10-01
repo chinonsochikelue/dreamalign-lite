@@ -124,7 +124,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const { user } = useUser()
   const { userDetail } = useUserDetails()
-  const analytics = useAnalytics() // Added analytics hook
+  const analytics = useAnalytics()
   const [stepStartTime, setStepStartTime] = useState(Date.now())
 
   const updateOnboardingStep = useMutation(api.users.updateOnboardingStep)
@@ -185,7 +185,28 @@ export default function OnboardingPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [currentStep, stepStartTime])
 
+  const isStepValid = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.interests.length >= 1
+      case 2:
+        return formData.skills.length >= 1 && formData.experienceLevel !== ""
+      case 3:
+        return formData.careerGoals.length >= 1 && formData.preferredLearningStyle !== ""
+      case 4:
+        return formData.personalityType !== "" && formData.workPreferences.length >= 1
+      case 5:
+        return formData.location !== "" && formData.remotePreference !== ""
+      default:
+        return false
+    }
+  }
+
   const handleNext = async () => {
+    if (!isStepValid()) {
+      return
+    }
+
     if (currentStep < 5) {
       setIsProcessing(true)
       try {
@@ -204,6 +225,7 @@ export default function OnboardingPage() {
           })
 
           setCurrentStep(currentStep + 1)
+          window.location.reload()
         }
       } catch (error) {
         console.error("Error updating onboarding step:", error)
@@ -212,6 +234,7 @@ export default function OnboardingPage() {
       setIsProcessing(false)
     } else {
       await handleComplete()
+      window.location.reload()
     }
   }
 
@@ -223,7 +246,7 @@ export default function OnboardingPage() {
 
   const handleComplete = async () => {
     setIsProcessing(true)
-    const onboardingStartTime = Date.now() - stepStartTime * 5 // Approximate total time
+    const onboardingStartTime = Date.now() - stepStartTime * 5
 
     try {
       const currentUser = userDetail || getUserByEmail
@@ -237,12 +260,11 @@ export default function OnboardingPage() {
 
         analytics.trackOnboardingCompleted(
           Date.now() - onboardingStartTime,
-          100, // 100% completion rate
+          100,
         )
 
         if (user?.primaryEmailAddress?.emailAddress && user.fullName && careerPathsResult) {
           try {
-            // Extract career path names from the result
             const careerPaths = careerPathsResult.map((path: any) => path.title || path.name || path)
 
             const emailSent = await sendCareerRecommendationEmail(
@@ -461,9 +483,9 @@ export default function OnboardingPage() {
             </Button>
             <Button
               onClick={handleNext}
-              disabled={isProcessing}
+              disabled={isProcessing || !isStepValid()}
               size="lg"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessing ? (
                 <>
@@ -492,6 +514,8 @@ export default function OnboardingPage() {
 
 // Step Components
 function InterestsStep({ formData, setFormData }) {
+  const [customInterest, setCustomInterest] = useState("")
+
   const toggleInterest = (interestId) => {
     setFormData((prev) => ({
       ...prev,
@@ -501,36 +525,91 @@ function InterestsStep({ formData, setFormData }) {
     }))
   }
 
+  const addCustomInterest = () => {
+    if (customInterest.trim() && !formData.interests.includes(customInterest.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        interests: [...prev.interests, customInterest.trim()],
+      }))
+      setCustomInterest("")
+    }
+  }
+
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {INTEREST_OPTIONS.map((interest, index) => (
-        <div
-          key={interest.id}
-          className={`group relative p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl ${
-            formData.interests.includes(interest.id)
-              ? "border-blue-400 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 shadow-lg scale-105"
-              : "border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600"
-          }`}
-          onClick={() => toggleInterest(interest.id)}
-        >
-          <div className="flex flex-col items-center text-center space-y-3">
-            <div
-              className={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl transition-transform group-hover:scale-110 ${interest.color}`}
-            >
-              {interest.icon}
-            </div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              {interest.label}
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{interest.description}</p>
-            {formData.interests.includes(interest.id) && (
-              <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in duration-200">
-                <Check className="w-4 h-4 text-white" />
+    <div className="space-y-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {INTEREST_OPTIONS.map((interest) => (
+          <div
+            key={interest.id}
+            className={`group relative p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl ${
+              formData.interests.includes(interest.id)
+                ? "border-blue-400 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 shadow-lg scale-105"
+                : "border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600"
+            }`}
+            onClick={() => toggleInterest(interest.id)}
+          >
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl transition-transform group-hover:scale-110 ${interest.color}`}
+              >
+                {interest.icon}
               </div>
-            )}
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                {interest.label}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{interest.description}</p>
+              {formData.interests.includes(interest.id) && (
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in duration-200">
+                  <Check className="w-4 h-4 text-white" />
+                </div>
+              )}
+            </div>
           </div>
+        ))}
+      </div>
+
+      <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+        <Label className="text-sm font-semibold mb-3 block">Don't see your interest? Add your own:</Label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g., Blockchain, IoT, EdTech..."
+            value={customInterest}
+            onChange={(e) => setCustomInterest(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && addCustomInterest()}
+            className="flex-1"
+          />
+          <Button onClick={addCustomInterest} variant="outline">
+            Add
+          </Button>
         </div>
-      ))}
+
+        {formData.interests.filter((i) => !INTEREST_OPTIONS.find((opt) => opt.id === i)).length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Custom interests:</p>
+            <div className="flex flex-wrap gap-2">
+              {formData.interests
+                .filter((i) => !INTEREST_OPTIONS.find((opt) => opt.id === i))
+                .map((interest) => (
+                  <Badge key={interest} className="bg-purple-500 text-white">
+                    {interest}
+                    <button
+                      onClick={() => toggleInterest(interest)}
+                      className="ml-2 hover:bg-purple-600 rounded-full w-4 h-4 flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {formData.interests.length > 0 && (
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-4">
+            ✓ {formData.interests.length} interest{formData.interests.length !== 1 ? "s" : ""} selected
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -644,6 +723,8 @@ function SkillsStep({ formData, setFormData }) {
 }
 
 function GoalsStep({ formData, setFormData }) {
+  const [customGoal, setCustomGoal] = useState("")
+
   const goalOptions = [
     "Get promoted",
     "Switch careers",
@@ -673,6 +754,16 @@ function GoalsStep({ formData, setFormData }) {
     }))
   }
 
+  const addCustomGoal = () => {
+    if (customGoal.trim() && !formData.careerGoals.includes(customGoal.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        careerGoals: [...prev.careerGoals, customGoal.trim()],
+      }))
+      setCustomGoal("")
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -689,6 +780,39 @@ function GoalsStep({ formData, setFormData }) {
             </Badge>
           ))}
         </div>
+
+        <div className="mt-4 flex gap-2">
+          <Input
+            placeholder="Add custom goal..."
+            value={customGoal}
+            onChange={(e) => setCustomGoal(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && addCustomGoal()}
+          />
+          <Button onClick={addCustomGoal} variant="outline">
+            Add
+          </Button>
+        </div>
+
+        {formData.careerGoals.filter((g) => !goalOptions.includes(g)).length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Custom goals:</p>
+            <div className="flex flex-wrap gap-2">
+              {formData.careerGoals
+                .filter((g) => !goalOptions.includes(g))
+                .map((goal) => (
+                  <Badge key={goal} className="bg-purple-500 text-white">
+                    {goal}
+                    <button
+                      onClick={() => toggleGoal(goal)}
+                      className="ml-2 hover:bg-purple-600 rounded-full w-4 h-4 flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
@@ -730,6 +854,8 @@ function GoalsStep({ formData, setFormData }) {
 }
 
 function PersonalityStep({ formData, setFormData }) {
+  const [customWorkPreference, setCustomWorkPreference] = useState("")
+
   const personalityTypes = [
     { value: "analytical", label: "Analytical", description: "Data-driven, logical thinker" },
     { value: "creative", label: "Creative", description: "Innovative, artistic mindset" },
@@ -757,6 +883,16 @@ function PersonalityStep({ formData, setFormData }) {
         ? prev.workPreferences.filter((p) => p !== preference)
         : [...prev.workPreferences, preference],
     }))
+  }
+
+  const addCustomWorkPreference = () => {
+    if (customWorkPreference.trim() && !formData.workPreferences.includes(customWorkPreference.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        workPreferences: [...prev.workPreferences, customWorkPreference.trim()],
+      }))
+      setCustomWorkPreference("")
+    }
   }
 
   return (
@@ -795,6 +931,39 @@ function PersonalityStep({ formData, setFormData }) {
             </Badge>
           ))}
         </div>
+
+        <div className="mt-4 flex gap-2">
+          <Input
+            placeholder="Add custom preference..."
+            value={customWorkPreference}
+            onChange={(e) => setCustomWorkPreference(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && addCustomWorkPreference()}
+          />
+          <Button onClick={addCustomWorkPreference} variant="outline">
+            Add
+          </Button>
+        </div>
+
+        {formData.workPreferences.filter((p) => !workPreferenceOptions.includes(p)).length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Custom preferences:</p>
+            <div className="flex flex-wrap gap-2">
+              {formData.workPreferences
+                .filter((p) => !workPreferenceOptions.includes(p))
+                .map((preference) => (
+                  <Badge key={preference} className="bg-purple-500 text-white">
+                    {preference}
+                    <button
+                      onClick={() => toggleWorkPreference(preference)}
+                      className="ml-2 hover:bg-purple-600 rounded-full w-4 h-4 flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

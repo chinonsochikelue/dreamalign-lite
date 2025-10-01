@@ -19,17 +19,15 @@ export default defineSchema({
     onboardingStep: v.optional(v.number()),
     personalityType: v.optional(v.string()),
     personalityTraits: v.optional(v.array(v.string())),
-    workPreferences: v.optional(
-      v.union(
-        v.array(v.string()),
-        v.object({
-          remoteWork: v.optional(v.boolean()),
-          teamSize: v.optional(v.string()),
-          workEnvironment: v.optional(v.string()),
-          careerGoals: v.optional(v.array(v.string())),
-        }),
-      ),
-    ),
+    workPreferences: v.optional(v.union(
+      v.array(v.string()),
+      v.object({
+        remoteWork: v.optional(v.boolean()),
+        teamSize: v.optional(v.string()),
+        workEnvironment: v.optional(v.string()),
+        careerGoals: v.optional(v.array(v.string())),
+      })
+    )),
     salaryExpectation: v.optional(
       v.object({
         min: v.number(),
@@ -87,34 +85,12 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
-  videoInterviewSessions: defineTable({
+  chatMessages: defineTable({
     userId: v.id("users"),
-    jobTitle: v.string(),
-    jobDescription: v.optional(v.string()),
-    resumeUrl: v.optional(v.string()),
-    vapiCallId: v.optional(v.string()),
-    questions: v.array(
-      v.object({
-        question: v.string(),
-        answer: v.optional(v.string()),
-        audioUrl: v.optional(v.string()),
-        feedback: v.optional(v.string()),
-        score: v.optional(v.number()),
-        timestamp: v.optional(v.number()),
-      }),
-    ),
-    transcript: v.optional(v.string()),
-    overallScore: v.optional(v.number()),
-    overallFeedback: v.optional(v.string()),
-    status: v.union(v.literal("pending"), v.literal("in-progress"), v.literal("completed"), v.literal("failed")),
-    duration: v.optional(v.number()),
-    recordingUrl: v.optional(v.string()),
-    createdAt: v.number(),
-    startedAt: v.optional(v.number()),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    timestamp: v.number(),
+  }).index("by_user", ["userId"]),
 
   userProgress: defineTable({
     userId: v.id("users"),

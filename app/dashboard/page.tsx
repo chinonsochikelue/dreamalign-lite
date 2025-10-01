@@ -50,7 +50,7 @@ import {
   Cell,
 } from "recharts"
 import { DashboardNav } from "@/components/dashboard-nav"
-import EmptyVideoInterview from "./emptyVideoInterview"
+import { AIChatCard } from "@/components/ui/ai-chat-card"
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
@@ -631,12 +631,6 @@ export default function DashboardPage() {
                 For You
               </TabsTrigger>
               <TabsTrigger
-                value="videoInterviews"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
-              >
-                Video Interviews
-              </TabsTrigger>
-              <TabsTrigger
                 value="interviews"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
               >
@@ -1001,6 +995,7 @@ export default function DashboardPage() {
 
                 {/* Quick Actions */}
                 <div className="space-y-6">
+                  <AIChatCard />
                   <Card className="border-0 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 shadow-xl">
                     <CardContent className="p-6 text-center">
                       <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -1163,76 +1158,6 @@ export default function DashboardPage() {
             </TabsContent>
 
             <TabsContent value="interviews" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Interview History</h2>
-                  <p className="text-slate-600 dark:text-slate-400 mt-2">
-                    Track your progress and review past interviews
-                  </p>
-                </div>
-                <Button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Interview
-                </Button>
-              </div>
-
-              <div className="grid gap-4">
-                {interviewHistory.map((interview, index) => (
-                  <Card
-                    key={interview.id}
-                    className="border-0 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                            <MessageSquare className="w-7 h-7 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">
-                              {interview.jobRole}
-                            </h3>
-                            <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                              >
-                                {interview.type}
-                              </Badge>
-                              <span>•</span>
-                              <span>{formatDate(interview.date)}</span>
-                              <span>•</span>
-                              <span>{interview.duration}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-right">
-                            <div className={`text-3xl font-bold ${getScoreColor(interview.score)} mb-1`}>
-                              {interview.score}/10
-                            </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Overall Score</p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            className="border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent"
-                          >
-                            View Details
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="videoInterviews" className="space-y-6">
-              {interviewList.length == 0 &&
-              <EmptyVideoInterview />
-              }
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Interview History</h2>

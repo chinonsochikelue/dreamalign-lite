@@ -207,3 +207,49 @@ function getFallbackEvaluation(answer: string): { score: number; feedback: strin
     feedback: "Good answer with solid content. Consider adding more specific examples from your experience to strengthen your response. Structure your answer using the STAR method (Situation, Task, Action, Result) for better clarity.",
   }
 }
+
+export async function chatWithContext(
+  message: string,
+  systemContext: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+): Promise<{ message: string; inputTokens?: number; outputTokens?: number }> {
+  const google = getGoogleProvider()
+  if (!google) {
+    console.warn("Google Gemini API key not configured, using fallback response")
+    return {
+      message: "I'm currently in offline mode. Please configure an API key to enable AI chat functionality.",
+    }
+  }
+
+  try {
+    // Build conversation with system context
+    const messages = [
+      { role: "system", content: systemContext },
+      ...conversationHistory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      { role: "user", content: message },
+    ]
+
+    const prompt = messages.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n")
+
+    const { text, usage } = await generateText({
+      model: google("gemini-2.5-flash"),
+      prompt,
+      temperature: 0.7,
+      maxTokens: 1000,
+    })
+
+    return {
+      message: text,
+      inputTokens: usage?.promptTokens,
+      outputTokens: usage?.completionTokens,
+    }
+  } catch (error) {
+    console.error("Error in chat with context:", error)
+    return {
+      message: "I apologize, but I encountered an error processing your message. Please try again.",
+    }
+  }
+}

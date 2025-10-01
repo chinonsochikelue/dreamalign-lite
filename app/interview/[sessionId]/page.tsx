@@ -244,7 +244,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
       setShowHints(false)
       setIsSubmitting(false)
     } catch (error) {
-      console.error("[v0] Error submitting answer:", error)
+      console.error("Error submitting answer:", error)
 
       // Fallback to mock evaluation
       const mockScore = Math.floor(Math.random() * 3) + 7
@@ -259,7 +259,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
           score: mockScore,
         })
       } catch (backendError) {
-        console.error("[v0] Backend submission failed:", backendError)
+        console.error("Backend submission failed:", backendError)
       }
 
       // Update local state with fallback
@@ -312,7 +312,7 @@ export default function EnhancedOriginalInterviewSessionPage() {
         // Navigate to results page
         router.push(`/interview/${sessionId}/results`)
       } catch (error) {
-        console.error("[v0] Error completing session:", error)
+        console.error("Error completing session:", error)
         // Still navigate to results even if backend fails
         router.push(`/interview/${sessionId}/results`)
       }

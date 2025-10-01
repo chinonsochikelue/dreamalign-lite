@@ -16,7 +16,7 @@ export async function generateInterviewQuestions(
     const numQuestions = difficulty === "beginner" ? 4 : difficulty === "advanced" ? 6 : 5
     return questions.slice(0, numQuestions)
   } catch (error) {
-    console.error("[v0] Error generating interview questions:", error)
+    console.error("Error generating interview questions:", error)
     // Return fallback questions on error
     return getFallbackQuestions(jobRole, interviewType, difficulty)
   }
@@ -34,7 +34,7 @@ export async function evaluateAnswer(
   try {
     return await aiService.evaluateInterviewAnswer(question, answer, jobRole)
   } catch (error) {
-    console.error("[v0] Error evaluating answer:", error)
+    console.error("Error evaluating answer:", error)
     // Return fallback evaluation on error
     return getFallbackEvaluation(answer)
   }

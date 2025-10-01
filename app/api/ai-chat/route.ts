@@ -107,6 +107,14 @@ function buildSystemContext(context: any): string {
   parts.push("- Suggest concrete next steps and resources")
   parts.push("- Keep responses concise but informative (2-4 paragraphs)")
   parts.push("- Use a friendly, professional tone")
+  parts.push("- If you don't have enough information, ask clarifying questions")
+  parts.push("- Format any lists using markdown for better readability")
+  parts.push("- Use bullet points or numbered lists where appropriate")
+  parts.push("- Include code snippets or examples when relevant")
+  parts.push("- Be mindful of the user's context and tailor responses accordingly")
+  parts.push("- Make use of google search results if provided")
+  parts.push("- Make use of google search results for grounding if needed")
+  parts.push("- Include citations for any external information used")
 
   return parts.join("\n")
 }

@@ -1,5 +1,5 @@
 import { generateText } from "ai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { createGoogleGenerativeAI, GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google"
 
 // Helper function to get Google provider (lazy initialization)
 function getGoogleProvider() {
@@ -201,7 +201,7 @@ function getFallbackQuestions(jobRole: string, interviewType: string): string[] 
 function getFallbackEvaluation(answer: string): { score: number; feedback: string } {
   const answerLength = answer.length
   const score = answerLength > 200 ? 8 : answerLength > 100 ? 7 : 6
-  
+
   return {
     score,
     feedback: "Good answer with solid content. Consider adding more specific examples from your experience to strengthen your response. Structure your answer using the STAR method (Situation, Task, Action, Result) for better clarity.",
@@ -234,13 +234,27 @@ export async function chatWithContext(
 
     const prompt = messages.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n")
 
-    const { text, usage } = await generateText({
+    const { text, usage,  sources, providerMetadata } = await generateText({
       model: google("gemini-2.5-flash"),
       prompt,
+      tools: {
+        google_search: google.tools.googleSearch({}),
+      },
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 8192,
+            includeThoughts: true,
+          },
+        },
+      },
       temperature: 0.7,
       maxTokens: 1000,
     })
-
+    const metadata = providerMetadata?.google as
+      | GoogleGenerativeAIProviderMetadata
+      | undefined;
+    const groundingMetadata = metadata?.groundingMetadata;
     return {
       message: text,
       inputTokens: usage?.promptTokens,

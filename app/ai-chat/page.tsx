@@ -352,9 +352,9 @@ export default function AIChatPage() {
                                     </div>
                                 )}
                                 <div className={`max-w-[70%] rounded-2xl px-5 py-4 shadow ${message.role === "user" ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100"}`}>
-                                    <ReactMarkdown className="text-base prose dark:prose-invert max-w-none">
-                                        {message.content}
-                                    </ReactMarkdown>
+                                    <div className="prose dark:prose-invert max-w-none text-base">
+                                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                                    </div>
                                     <div className="flex items-center justify-between mt-2">
                                         <span className="text-xs opacity-70">{new Date(message.timestamp).toLocaleTimeString()}</span>
                                         {message.role === "assistant" && idx === messages.length - 1 && (
